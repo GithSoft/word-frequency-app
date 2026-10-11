@@ -121,6 +121,42 @@ app.delete('/api/analysis/:fileId', (req, res) => {
     }
 });
 
+// On-demand context extraction endpoint
+app.get('/api/analysis/:fileId/context/:word', async (req, res) => {
+    try {
+        const { fileId, word } = req.params;
+        const result = resultsCache.get(fileId);
+        if (!result) {
+            return res.status(404).json({ error: 'Analysis not found' });
+        }
+
+        const targetWord = word.toLowerCase();
+        const existing = result.analysis?.results?.find(i => i.word.toLowerCase() === targetWord);
+        if (existing && existing.context && existing.context.length > 0) {
+            return res.json({ success: true, word: targetWord, context: existing.context });
+        }
+
+        if (result.cachePath) {
+            try {
+                const text = await fs.promises.readFile(result.cachePath, 'utf8');
+                const contextMap = await extractContexts(text, [targetWord], { caseSensitive: false });
+                const contexts = contextMap.get(targetWord) || [];
+                if (existing) {
+                    existing.context = contexts;
+                }
+                return res.json({ success: true, word: targetWord, context: contexts });
+            } catch (readErr) {
+                console.warn('Failed reading cachePath for on-demand context:', readErr.message);
+            }
+        }
+
+        res.json({ success: true, word: targetWord, context: [] });
+    } catch (err) {
+        console.error('Error fetching on-demand context:', err);
+        res.status(500).json({ error: 'Failed to extract context', message: err.message });
+    }
+});
+
 const crypto = require('crypto');
 
 // Helper: Calculate file hash
@@ -161,11 +197,9 @@ async function processNextInQueue() {
         const text = await fs.promises.readFile(cachePath, 'utf8');
         const analysis = result.analysis;
 
-        const topWords = analysis.results
-            .slice(0, 1000)
-            .map(item => item.word);
+        const allWords = analysis.results.map(item => item.word);
 
-        const contextMap = await extractContexts(text, topWords, {
+        const contextMap = await extractContexts(text, allWords, {
             caseSensitive: false,
             checkAbort: () => !resultsCache.has(fileId) // If removed from cache, abort
         });

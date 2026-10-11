@@ -26,6 +26,16 @@ const tableBody = document.getElementById('tableBody');
 const fileSelector = document.getElementById('fileSelector');
 const savedCountEl = document.getElementById('savedCount');
 
+function escapeHtml(str) {
+    if (!str) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
 // ==========================================
 // Initialization
 // ==========================================
@@ -471,11 +481,25 @@ function getAggregatedData() {
     if (showSavedOnly) {
         const savedSet = new Set(savedWords);
         results = results.filter(item => savedSet.has(item.word));
+
+        // Find any words in savedWords that were not in results and append as custom words
+        const existingWords = new Set(results.map(r => r.word.toLowerCase()));
+        savedWords.forEach(savedWord => {
+            if (!existingWords.has(savedWord.toLowerCase())) {
+                results.push({
+                    word: savedWord,
+                    count: 0,
+                    percentage: '0.00',
+                    context: [],
+                    isCustom: true
+                });
+            }
+        });
     }
 
-    // Precompute rank (1-indexed based on frequency order)
+    // Precompute rank (1-indexed based on frequency order, '—' for custom words)
     results.forEach((item, index) => {
-        item.rank = index + 1;
+        item.rank = (item.isCustom || item.count === 0) ? '—' : index + 1;
     });
 
     cachedAggregatedData = {
@@ -572,18 +596,23 @@ const CHUNK_SIZE = 100;
 
 function renderRow(item, savedSet) {
     const isSaved = savedSet.has(item.word);
+    const countDisplay = typeof item.count === 'number' && item.count > 0 ? item.count.toLocaleString() : '0';
+    const rankDisplay = item.rank !== undefined ? item.rank : '—';
+    const pctDisplay = item.percentage !== undefined ? item.percentage : '0.00';
+    const escapedWord = escapeHtml(item.word);
+
     return `
-    <tr class="word-row" onclick="showContext('${item.word}')">
-      <td>${item.rank}</td>
+    <tr class="word-row" onclick="showContext('${escapedWord}')">
+      <td>${rankDisplay}</td>
       <td class="word-cell">
-        <span class="word-text">${item.word}</span>
-        <button class="icon-btn tts-hover-btn" onclick="event.stopPropagation(); speakWord('${item.word}')" title="Listen">🔊</button>
+        <span class="word-text">${escapedWord}</span>
+        <button class="icon-btn tts-hover-btn" onclick="event.stopPropagation(); speakWord('${escapedWord}')" title="Listen">🔊</button>
       </td>
-      <td>${item.count.toLocaleString()}</td>
-      <td>${item.percentage}%</td>
+      <td>${countDisplay}</td>
+      <td>${pctDisplay}%</td>
       <td onclick="event.stopPropagation()">
         <button class="save-btn ${isSaved ? 'saved' : ''}" 
-                onclick="toggleSave('${item.word}')" 
+                onclick="toggleSave('${escapedWord}')" 
                 title="${isSaved ? 'Remove from saved' : 'Save word'}">
           ${isSaved ? '⭐' : '☆'}
         </button>
@@ -662,24 +691,72 @@ function updateTable() {
         ? tableData.filter(item => item.word.toLowerCase().includes(searchTerm))
         : [...tableData];
 
+    if (currentFilteredData.length === 0) {
+        if (!searchTerm) {
+            tableBody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding: 30px; color: #888;">No words to display</td></tr>';
+        } else {
+            const savedSet = new Set(savedWords.map(w => w.toLowerCase()));
+            const isSaved = savedSet.has(searchTerm.toLowerCase());
+            const escapedTerm = escapeHtml(searchTerm);
+
+            tableBody.innerHTML = `
+                <tr>
+                    <td colspan="5" style="text-align:center; padding: 35px 20px;">
+                        <div style="max-width: 480px; margin: 0 auto; display: flex; flex-direction: column; align-items: center; gap: 12px;">
+                            <div style="font-size: 1.05rem; color: #a8a8b3;">
+                                No matches found for <strong>'${escapedTerm}'</strong> in this document.
+                            </div>
+                            <div style="display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;">
+                                <button id="emptySearchSaveBtn" class="primary-btn" style="display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; font-size: 0.9rem; cursor: pointer; ${isSaved ? 'background: linear-gradient(135deg, #10b981 0%, #059669 100%);' : ''}">
+                                    ${isSaved ? '⭐ Saved in Vocabulary' : '⭐ Add to Vocabulary'}
+                                </button>
+                                <button id="emptySearchDictBtn" class="primary-btn" style="display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; font-size: 0.9rem; cursor: pointer; background: #6c757d;">
+                                    📖 View Definitions
+                                </button>
+                            </div>
+                        </div>
+                    </td>
+                </tr>
+            `;
+
+            const saveBtn = document.getElementById('emptySearchSaveBtn');
+            if (saveBtn) {
+                saveBtn.addEventListener('click', () => {
+                    toggleSave(searchTerm);
+                    const currentlySaved = new Set(savedWords.map(w => w.toLowerCase())).has(searchTerm.toLowerCase());
+                    saveBtn.innerHTML = currentlySaved ? '⭐ Saved in Vocabulary' : '⭐ Add to Vocabulary';
+                    saveBtn.style.background = currentlySaved ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : '';
+                });
+            }
+
+            const dictBtn = document.getElementById('emptySearchDictBtn');
+            if (dictBtn) {
+                dictBtn.addEventListener('click', () => {
+                    showContext(searchTerm);
+                });
+            }
+        }
+        return;
+    }
+
     currentFilteredData.sort((a, b) => {
         let aVal, bVal;
         switch (sortColumn) {
             case 'rank':
-                aVal = a.rank;
-                bVal = b.rank;
+                aVal = typeof a.rank === 'number' ? a.rank : 999999999;
+                bVal = typeof b.rank === 'number' ? b.rank : 999999999;
                 break;
             case 'word':
                 aVal = a.word;
                 bVal = b.word;
                 break;
             case 'count':
-                aVal = a.count;
-                bVal = b.count;
+                aVal = typeof a.count === 'number' ? a.count : -1;
+                bVal = typeof b.count === 'number' ? b.count : -1;
                 break;
             case 'percentage':
-                aVal = parseFloat(a.percentage);
-                bVal = parseFloat(b.percentage);
+                aVal = parseFloat(a.percentage) || 0;
+                bVal = parseFloat(b.percentage) || 0;
                 break;
         }
 
@@ -732,79 +809,114 @@ function speakWord(word) {
 
 async function showContext(word) {
     const data = getAggregatedData();
-    const item = data.results.find(i => i.word === word);
-
-    if (!item) return;
+    const item = data.results.find(i => i.word.toLowerCase() === word.toLowerCase()) || null;
 
     const modal = document.getElementById('contextModal');
     const wordSpan = document.getElementById('contextWord');
     const list = document.getElementById('contextSentences');
+    const escapedWord = escapeHtml(word);
 
     // Setup Header with Word and Actions
     wordSpan.innerHTML = `
-        ${word}
-        <button class="icon-btn" onclick="speakWord('${word}')" title="Listen" style="font-size: 1rem; margin-left: 8px;">🔊</button>
-        <a href="https://translate.google.com/?sl=auto&tl=vi&text=${word}" target="_blank" class="icon-btn" title="Translate (Google)" style="font-size: 1rem; text-decoration: none;">🌐</a>
+        ${escapedWord}
+        <button class="icon-btn" onclick="speakWord('${escapedWord}')" title="Listen" style="font-size: 1rem; margin-left: 8px;">🔊</button>
+        <a href="https://translate.google.com/?sl=auto&tl=vi&text=${encodeURIComponent(word)}" target="_blank" class="icon-btn" title="Translate (Google)" style="font-size: 1rem; text-decoration: none;">🌐</a>
     `;
-
-    // Reset and show loading state
-    list.innerHTML = '<div class="loading">Loading details...</div>';
-    modal.style.display = 'flex';
 
     // Check if any selected file is still processing
     const processingFiles = Object.values(filesData).filter(f => selectedFiles.has(f.fileName) && f.status === 'processing');
 
-    const contexts = item.context || [];
-    let contextHtml = '';
+    const contexts = item?.context || [];
+    let contextHtml = '<div class="section-title">Context Examples</div>';
 
-    // Prepare Context HTML
-    contextHtml += '<div class="section-title">Context Examples</div>';
-
-    if (processingFiles.length > 0 && contexts.length === 0) {
+    if (contexts.length > 0) {
+        contexts.forEach(sentence => {
+            const regex = new RegExp(`\\b${escapeHtml(word)}\\b`, 'gi');
+            const highlighted = escapeHtml(sentence).replace(regex, match => `<strong>${match}</strong>`);
+            contextHtml += `<div class="context-item">${highlighted}</div>`;
+        });
+    } else if (item && item.isCustom) {
+        contextHtml += '<div class="context-item info-message">Custom added word (no book context excerpt available).</div>';
+    } else if (processingFiles.length > 0) {
         contextHtml += `
             <div class="context-item info-message">
                 <div class="spinner-dot"></div>
                 Analysis in progress... Context examples will appear shortly.
             </div>`;
-    } else if (contexts.length === 0) {
-        contextHtml += '<div class="context-item">No context examples found for this word.</div>';
     } else {
-        contexts.forEach(sentence => {
-            const regex = new RegExp(`\\b${word}\\b`, 'gi');
-            const highlighted = sentence.replace(regex, match => `<strong>${match}</strong>`);
-            contextHtml += `<div class="context-item">${highlighted}</div>`;
-        });
+        contextHtml += '<div class="context-item">No context examples found for this word.</div>';
     }
 
-    // Fetch Definitions
-    try {
-        const res = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${word}`);
-        const defs = await res.json();
+    // Render modal structure and local context IMMEDIATELY (< 1ms)
+    list.innerHTML = `
+        <div class="definitions-section" id="definitionsContainer">
+            <div class="section-title">Definitions</div>
+            <div class="loading" style="padding: 10px 0; font-size: 0.9rem; color: #888;">
+                <div class="spinner-dot" style="display:inline-block; vertical-align:middle; margin-right:6px;"></div> Loading definitions...
+            </div>
+        </div>
+        <div class="contexts-section" id="contextsContainer">
+            ${contextHtml}
+        </div>
+    `;
+    modal.style.display = 'flex';
 
-        let defHtml = '<div class="section-title">Definitions</div>';
-        if (Array.isArray(defs) && defs.length > 0) {
-            defs[0].meanings.forEach(m => {
-                defHtml += `<div class="definition-group">
-                    <span class="part-of-speech">${m.partOfSpeech}</span>
-                    <ul class="def-list">${m.definitions.slice(0, 2).map(d => `<li>${d.definition}</li>`).join('')}</ul>
-                </div>`;
-            });
-        } else {
-            defHtml += '<p class="no-data">No definitions found.</p>';
+    // On-demand context extraction if contexts are 0 and document files exist
+    if (contexts.length === 0 && (!item || !item.isCustom)) {
+        const activeFiles = Object.values(filesData).filter(f => selectedFiles.has(f.fileName) && f.fileId);
+        if (activeFiles.length > 0) {
+            fetch(`/api/analysis/${activeFiles[0].fileId}/context/${encodeURIComponent(word)}`)
+                .then(r => r.json())
+                .then(res => {
+                    if (res.success && res.context && res.context.length > 0) {
+                        if (item) item.context = res.context;
+                        let updatedContextHtml = '<div class="section-title">Context Examples</div>';
+                        res.context.forEach(sentence => {
+                            const regex = new RegExp(`\\b${escapeHtml(word)}\\b`, 'gi');
+                            const highlighted = escapeHtml(sentence).replace(regex, match => `<strong>${match}</strong>`);
+                            updatedContextHtml += `<div class="context-item">${highlighted}</div>`;
+                        });
+                        const cContainer = document.getElementById('contextsContainer');
+                        if (cContainer) cContainer.innerHTML = updatedContextHtml;
+                    }
+                })
+                .catch(() => {});
         }
-
-        list.innerHTML = `
-            <div class="definitions-section">${defHtml}</div>
-            <div class="contexts-section">${contextHtml}</div>
-        `;
-    } catch (err) {
-        console.error('Dict fetch error', err);
-        // Fallback to just showing context
-        list.innerHTML = `
-            <div class="definitions-section"><p class="error-text">Could not load definitions.</p></div>
-            <div class="contexts-section">${contextHtml}</div>
-        `;
     }
+
+    // Asynchronous Dictionary API fetch with 3-second timeout
+    (async () => {
+        try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 3000);
+            const res = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(word)}`, {
+                signal: controller.signal
+            });
+            clearTimeout(timeoutId);
+
+            const defs = await res.json();
+            let defHtml = '<div class="section-title">Definitions</div>';
+            if (Array.isArray(defs) && defs.length > 0 && defs[0].meanings) {
+                defs[0].meanings.forEach(m => {
+                    defHtml += `<div class="definition-group">
+                        <span class="part-of-speech">${escapeHtml(m.partOfSpeech)}</span>
+                        <ul class="def-list">${m.definitions.slice(0, 2).map(d => `<li>${escapeHtml(d.definition)}</li>`).join('')}</ul>
+                    </div>`;
+                });
+            } else {
+                defHtml += '<p class="no-data">No definitions found.</p>';
+            }
+
+            const defContainer = document.getElementById('definitionsContainer');
+            if (defContainer) defContainer.innerHTML = defHtml;
+        } catch (err) {
+            console.warn('Dict fetch error/timeout:', err.message);
+            const defContainer = document.getElementById('definitionsContainer');
+            if (defContainer) {
+                defContainer.innerHTML = '<div class="section-title">Definitions</div><p class="error-text" style="color: #888; font-size: 0.9rem;">Definitions unavailable (external dictionary offline or timed out).</p>';
+            }
+        }
+    })();
 }
 
 window.showContext = showContext;
@@ -1027,27 +1139,33 @@ async function loadCard() {
     fcProgressText.textContent = `Word ${currentCardIndex + 1} of ${reviewQueue.length}`;
 
     // Fetch details
-    // 1. Definition
+    // 1. Definition (with 3-second timeout)
     try {
-        const res = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${word}`);
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 3000);
+        const res = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(word)}`, {
+            signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+
         const defs = await res.json();
-        if (Array.isArray(defs) && defs.length > 0 && defs[0].meanings.length > 0) {
+        if (Array.isArray(defs) && defs.length > 0 && defs[0].meanings && defs[0].meanings.length > 0) {
             const firstDef = defs[0].meanings[0].definitions[0].definition;
             fcDefinition.textContent = firstDef;
         } else {
             fcDefinition.textContent = 'No definition found.';
         }
     } catch (e) {
-        fcDefinition.textContent = 'Could not load definition.';
+        fcDefinition.textContent = 'Definitions unavailable (external dictionary offline or timed out).';
     }
 
     // 2. Context (Find from local data)
     const data = getAggregatedData();
-    const item = data.results.find(i => i.word === word);
+    const item = data.results.find(i => i.word.toLowerCase() === word.toLowerCase());
     if (item && item.context && item.context.length > 0) {
-        fcContext.innerHTML = `"${item.context[0]}"`;
+        fcContext.innerHTML = `"${escapeHtml(item.context[0])}"`;
     } else {
-        fcContext.textContent = 'No context available.';
+        fcContext.textContent = 'Custom added word (no book context excerpt available).';
     }
 }
 

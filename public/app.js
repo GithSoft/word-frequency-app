@@ -342,6 +342,7 @@ function updateFileSelector() {
 
 function toggleAllFiles(checked) {
     showSavedOnly = false;
+    invalidateAggregatedData();
     if (checked) {
         selectedFiles = new Set(Object.keys(filesData));
     } else {
@@ -355,6 +356,7 @@ function toggleAllFiles(checked) {
 
 function toggleFile(fileName, checked) {
     showSavedOnly = false;
+    invalidateAggregatedData();
     if (checked) {
         selectedFiles.add(fileName);
     } else {
@@ -368,6 +370,7 @@ function toggleFile(fileName, checked) {
 
 function toggleSavedOnly(checked) {
     showSavedOnly = checked;
+    invalidateAggregatedData();
     if (checked) {
         // When showing saved only, still use all files for counts
         selectedFiles = new Set(Object.keys(filesData));
@@ -416,7 +419,17 @@ function updateStats() {
     savedCountEl.textContent = savedWords.length.toLocaleString();
 }
 
+let cachedAggregatedData = null;
+
+function invalidateAggregatedData() {
+    cachedAggregatedData = null;
+}
+
 function getAggregatedData() {
+    if (cachedAggregatedData) {
+        return cachedAggregatedData;
+    }
+
     const wordMap = new Map(); // word -> { count, context[] }
     let totalWords = 0;
 
@@ -456,16 +469,22 @@ function getAggregatedData() {
 
     // Filter for saved words only
     if (showSavedOnly) {
-        results = results.filter(item => savedWords.includes(item.word));
+        const savedSet = new Set(savedWords);
+        results = results.filter(item => savedSet.has(item.word));
     }
 
-    // No limit on results - show all words
+    // Precompute rank (1-indexed based on frequency order)
+    results.forEach((item, index) => {
+        item.rank = index + 1;
+    });
 
-    return {
+    cachedAggregatedData = {
         results,
         totalWords,
         uniqueWords: wordMap.size
     };
+
+    return cachedAggregatedData;
 }
 
 // ==========================================
@@ -547,6 +566,41 @@ let tableData = [];
 let sortColumn = 'count';
 let sortDirection = 'desc';
 
+let currentFilteredData = [];
+let renderedCount = 0;
+const CHUNK_SIZE = 100;
+
+function renderRow(item, savedSet) {
+    const isSaved = savedSet.has(item.word);
+    return `
+    <tr class="word-row" onclick="showContext('${item.word}')">
+      <td>${item.rank}</td>
+      <td class="word-cell">
+        <span class="word-text">${item.word}</span>
+        <button class="icon-btn tts-hover-btn" onclick="event.stopPropagation(); speakWord('${item.word}')" title="Listen">🔊</button>
+      </td>
+      <td>${item.count.toLocaleString()}</td>
+      <td>${item.percentage}%</td>
+      <td onclick="event.stopPropagation()">
+        <button class="save-btn ${isSaved ? 'saved' : ''}" 
+                onclick="toggleSave('${item.word}')" 
+                title="${isSaved ? 'Remove from saved' : 'Save word'}">
+          ${isSaved ? '⭐' : '☆'}
+        </button>
+      </td>
+    </tr>
+  `;
+}
+
+function appendNextChunk() {
+    if (renderedCount >= currentFilteredData.length) return;
+    const nextChunk = currentFilteredData.slice(renderedCount, renderedCount + CHUNK_SIZE);
+    renderedCount += nextChunk.length;
+    const savedSet = new Set(savedWords);
+    const rowsHtml = nextChunk.map(item => renderRow(item, savedSet)).join('');
+    tableBody.insertAdjacentHTML('beforeend', rowsHtml);
+}
+
 function renderTable() {
     const data = getAggregatedData();
     tableData = data.results;
@@ -574,6 +628,7 @@ function renderTable() {
         if (saveHeader) {
             saveHeader.addEventListener('click', () => {
                 showSavedOnly = !showSavedOnly;
+                invalidateAggregatedData();
                 saveHeader.classList.toggle('filter-active', showSavedOnly);
                 updateFileSelector();
                 updateStats();
@@ -581,22 +636,38 @@ function renderTable() {
                 renderTable();
             });
         }
+
+        // Infinite scroll listeners (window and container)
+        window.addEventListener('scroll', () => {
+            if (window.innerHeight + window.scrollY >= document.body.offsetHeight - 500) {
+                appendNextChunk();
+            }
+        });
+
+        const tableWrapper = document.querySelector('.table-wrapper');
+        if (tableWrapper) {
+            tableWrapper.addEventListener('scroll', () => {
+                if (tableWrapper.scrollTop + tableWrapper.clientHeight >= tableWrapper.scrollHeight - 200) {
+                    appendNextChunk();
+                }
+            });
+        }
     }
 }
 
 function updateTable() {
-    const searchTerm = searchBox.value.toLowerCase();
+    const searchTerm = searchBox.value.toLowerCase().trim();
 
-    let filtered = tableData.filter(item =>
-        item.word.toLowerCase().includes(searchTerm)
-    );
+    currentFilteredData = searchTerm
+        ? tableData.filter(item => item.word.toLowerCase().includes(searchTerm))
+        : [...tableData];
 
-    filtered.sort((a, b) => {
+    currentFilteredData.sort((a, b) => {
         let aVal, bVal;
         switch (sortColumn) {
             case 'rank':
-                aVal = tableData.indexOf(a);
-                bVal = tableData.indexOf(b);
+                aVal = a.rank;
+                bVal = b.rank;
                 break;
             case 'word':
                 aVal = a.word;
@@ -623,31 +694,9 @@ function updateTable() {
         }
     });
 
-    tableBody.innerHTML = filtered.map((item, index) => {
-        const isSaved = savedWords.includes(item.word);
-        const rank = tableData.indexOf(item) + 1;
-
-        // Context click handler is on the row
-        // Stop propagation for the buttons
-        return `
-    <tr class="word-row" onclick="showContext('${item.word}')">
-      <td>${rank}</td>
-      <td class="word-cell">
-        <span class="word-text">${item.word}</span>
-        <button class="icon-btn tts-hover-btn" onclick="event.stopPropagation(); speakWord('${item.word}')" title="Listen">🔊</button>
-      </td>
-      <td>${item.count.toLocaleString()}</td>
-      <td>${item.percentage}%</td>
-      <td onclick="event.stopPropagation()">
-        <button class="save-btn ${isSaved ? 'saved' : ''}" 
-                onclick="toggleSave('${item.word}')" 
-                title="${isSaved ? 'Remove from saved' : 'Save word'}">
-          ${isSaved ? '⭐' : '☆'}
-        </button>
-      </td>
-    </tr>
-  `;
-    }).join('');
+    tableBody.innerHTML = '';
+    renderedCount = 0;
+    appendNextChunk();
 }
 
 // ==========================================
@@ -661,6 +710,10 @@ function toggleSave(word) {
         savedWords.push(word);
     }
     saveSavedWords();
+    invalidateAggregatedData();
+    if (showSavedOnly) {
+        tableData = getAggregatedData().results;
+    }
     updateFileSelector();
     updateTable();
     updateStats();
@@ -775,20 +828,27 @@ document.getElementById('contextModal').addEventListener('click', (e) => {
 // ==========================================
 // Search & Export
 // ==========================================
-searchBox.addEventListener('input', updateTable);
+let searchDebounceTimer = null;
+searchBox.addEventListener('input', () => {
+    clearTimeout(searchDebounceTimer);
+    searchDebounceTimer = setTimeout(() => {
+        updateTable();
+    }, 150);
+});
 
 exportBtn.addEventListener('click', () => {
     const data = getAggregatedData();
     if (!data.results.length) return;
 
+    const savedSet = new Set(savedWords);
     const csv = [
         ['Rank', 'Word', 'Count', 'Percentage', 'Saved'],
         ...data.results.map((item, idx) => [
-            idx + 1,
+            item.rank || (idx + 1),
             item.word,
             item.count,
             item.percentage + '%',
-            savedWords.includes(item.word) ? 'Yes' : ''
+            savedSet.has(item.word) ? 'Yes' : ''
         ])
     ].map(row => row.join(',')).join('\n');
 
@@ -871,10 +931,12 @@ function resetUpload() {
 }
 
 function saveFilesData() {
+    invalidateAggregatedData();
     localStorage.setItem('wfa_files', JSON.stringify(filesData));
 }
 
 function saveSavedWords() {
+    invalidateAggregatedData();
     localStorage.setItem('wfa_saved', JSON.stringify(savedWords));
 }
 

@@ -7,7 +7,7 @@ const fs = require('fs');
  */
 async function parseTXT(filePath) {
     try {
-        return fs.readFileSync(filePath, 'utf-8');
+        return await fs.promises.readFile(filePath, 'utf-8');
     } catch (error) {
         throw new Error(`Failed to parse TXT: ${error.message}`);
     }

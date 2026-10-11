@@ -18,6 +18,13 @@ const SavedWord = sequelize.define('SavedWord', {
         type: DataTypes.INTEGER,
         defaultValue: 0
     }
+}, {
+    indexes: [
+        {
+            unique: true,
+            fields: ['UserId', 'word']
+        }
+    ]
 });
 
 module.exports = SavedWord;

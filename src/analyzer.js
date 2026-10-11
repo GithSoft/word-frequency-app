@@ -18,7 +18,41 @@ const STOPWORDS = new Set([
   'new', 'want', 'because', 'any', 'these', 'give', 'day', 'most', 'us'
 ]);
 
-const natural = require('natural');
+const abbrRegex = /\b(Mr|Mrs|Ms|Dr|Prof|Sr|Jr|vs|etc|i\.e|e\.g)\.$/i;
+const singleLetterRegex = /\b[A-Za-z]\.$/;
+const numRegex = /\b\d+\.$/;
+
+/**
+ * Generator that stitches sentence segments split incorrectly across abbreviations or decimal numbers
+ * @param {string} rawText
+ */
+function* getStitchedSentences(rawText) {
+  const segmenter = new Intl.Segmenter('en', { granularity: 'sentence' });
+  let pending = '';
+
+  for (const { segment } of segmenter.segment(rawText)) {
+    if (!pending) {
+      pending = segment;
+      continue;
+    }
+
+    const trimmed = pending.trimEnd();
+    const isAbbr = abbrRegex.test(trimmed) || singleLetterRegex.test(trimmed) || numRegex.test(trimmed);
+    const nextTrimmed = segment.trimStart();
+    const nextStartsWordOrNum = /^[\w\d]/.test(nextTrimmed);
+
+    if (isAbbr && nextStartsWordOrNum) {
+      pending += segment;
+    } else {
+      yield pending;
+      pending = segment;
+    }
+  }
+
+  if (pending) {
+    yield pending;
+  }
+}
 
 /**
  * Analyzes word frequency in text
@@ -35,26 +69,24 @@ async function analyzeWordFrequency(text, options = {}) {
     skipContext = false
   } = options;
 
-  // Preprocess text to handle PDF line breaks
-  // Replace single newlines with spaces, keep double newlines as paragraph breaks
-  const sanitizedText = text.replace(/(?<!\n)\n(?!\n)/g, ' ');
-
-  // Convert to lowercase unless case sensitive
-  const processedText = caseSensitive ? sanitizedText : sanitizedText.toLowerCase();
-
-  // Tokenize words
-  const words = processedText.match(/\b[a-zA-Z]+\b/g) || [];
-
-  // Count frequency
+  // Stream regex matching directly over text to avoid creating large intermediate arrays
+  const regex = /\b[a-zA-Z]+\b/g;
+  let match;
   const frequencyMap = new Map();
   let totalWords = 0;
+  let totalWordsAnalyzed = 0;
   let wordIdx = 0;
 
-  for (const word of words) {
-    // NEW: Yield to event loop every 10k words to allow interleaved parallel counting
+  while ((match = regex.exec(text)) !== null) {
+    totalWordsAnalyzed++;
+
+    // Yield to event loop every 10k words to allow interleaved parallel counting
     if (wordIdx++ % 10000 === 0) {
       await new Promise(resolve => setImmediate(resolve));
     }
+
+    const rawWord = match[0];
+    const word = caseSensitive ? rawWord : rawWord.toLowerCase();
 
     // Filter by length
     if (word.length < minLength) continue;
@@ -88,7 +120,7 @@ async function analyzeWordFrequency(text, options = {}) {
       totalWords,
       uniqueWords: frequencyMap.size,
       stats: {
-        totalWordsAnalyzed: words.length,
+        totalWordsAnalyzed,
         wordsAfterFiltering: totalWords,
         uniqueWords: frequencyMap.size
       }
@@ -120,7 +152,7 @@ async function analyzeWordFrequency(text, options = {}) {
     totalWords,
     uniqueWords: frequencyMap.size,
     stats: {
-      totalWordsAnalyzed: words.length,
+      totalWordsAnalyzed,
       wordsAfterFiltering: totalWords,
       uniqueWords: frequencyMap.size
     }
@@ -134,58 +166,57 @@ async function analyzeWordFrequency(text, options = {}) {
  * @param {object} options - Options
  * @returns {Map<string, string[]>} Map of word -> context sentences
  */
-/**
- * Extracts context sentences for specific words
- * @param {string} text - The full text
- * @param {string[]} targetWords - Words to find context for
- * @param {object} options - Options
- * @returns {Map<string, string[]>} Map of word -> context sentences
- */
 async function extractContexts(text, targetWords, options = {}) {
   const { caseSensitive = false } = options;
   const wordContexts = new Map(); // word -> Array<{ text: string, score: number }>
-  const targetSet = new Set(targetWords);
+  const targetWordsNorm = caseSensitive ? targetWords : targetWords.map(w => w.toLowerCase());
+  const targetSet = new Set(targetWordsNorm);
 
-  // Tokenize sentences
+  // Preprocess text to handle PDF line breaks
   const sanitizedText = text.replace(/(?<!\n)\n(?!\n)/g, ' ');
-  const tokenizer = new natural.SentenceTokenizer();
-  const sentences = tokenizer.tokenize(sanitizedText);
 
-  if (sentences && sentences.length > 0) {
-    let i = 0;
-    for (const sentence of sentences) {
-      // Check for abortion every 10 sentences to avoid overhead
-      if (i % 10 === 0 && options.checkAbort && options.checkAbort()) {
-        console.log('🛑 extractContexts: Abort signal received');
-        return null;
-      }
+  let i = 0;
+  let lastYield = Date.now();
 
-      // NEW: Yield to event loop every 20 sentences to keep server responsive
-      if (i % 20 === 0) {
-        await new Promise(resolve => setImmediate(resolve));
-      }
-      i++;
+  for (const sentence of getStitchedSentences(sanitizedText)) {
+    // Check for abortion every 10 sentences to avoid overhead
+    if (i % 10 === 0 && options.checkAbort && options.checkAbort()) {
+      console.log('🛑 extractContexts: Abort signal received');
+      return null;
+    }
 
-      // 1. Hard Filter: Skip bad sentences immediately
-      if (!isValidContext(sentence)) continue;
+    // Yield to event loop using elapsed time floor (20ms) and safety floor (200 sentences)
+    if (Date.now() - lastYield > 20 || i % 200 === 0) {
+      await new Promise(resolve => setImmediate(resolve));
+      lastYield = Date.now();
+    }
+    i++;
 
-      const sentenceLower = caseSensitive ? sentence : sentence.toLowerCase();
-      const wordsInSentence = sentenceLower.match(/\b[a-zA-Z]+\b/g) || [];
+    // 1. Hard Filter: Skip bad sentences immediately
+    if (!isValidContext(sentence)) continue;
 
-      // Check each word in the sentence
-      for (const word of wordsInSentence) {
-        if (targetSet.has(word)) {
-          if (!wordContexts.has(word)) {
-            wordContexts.set(word, []);
-          }
+    const sentenceLower = caseSensitive ? sentence : sentence.toLowerCase();
+    const wordsInSentence = sentenceLower.match(/\b[a-zA-Z]+\b/g) || [];
+    const seenWordsInSentence = new Set();
+    const trimmed = sentence.trim();
+    const trimmedLower = sentenceLower.trim();
 
-          const contexts = wordContexts.get(word);
+    // Check each word in the sentence
+    for (const word of wordsInSentence) {
+      if (seenWordsInSentence.has(word)) continue;
+      seenWordsInSentence.add(word);
 
-          // 2. Collect candidates (limit to 50 to avoid memory bloat)
-          if (contexts.length < 50) {
-            const score = scoreSentence(sentence, word);
-            contexts.push({ text: sentence.trim(), score });
-          }
+      if (targetSet.has(word)) {
+        if (!wordContexts.has(word)) {
+          wordContexts.set(word, []);
+        }
+
+        const contexts = wordContexts.get(word);
+
+        // 2. Collect candidates (limit to 50 to avoid memory bloat)
+        if (contexts.length < 50) {
+          const score = scoreSentence(sentence, word, word, trimmedLower);
+          contexts.push({ text: trimmed, score });
         }
       }
     }
@@ -194,11 +225,14 @@ async function extractContexts(text, targetWords, options = {}) {
   // 3. Sort and Select Top 5 for each word
   const finalContexts = new Map();
   let sortIdx = 0;
+  let lastSortYield = Date.now();
   for (const [word, candidates] of wordContexts.entries()) {
-    // NEW: Yield every 100 words during sorting to keep loop responsive
-    if (sortIdx++ % 100 === 0) {
+    // Yield every 20ms or 200 words during sorting to keep loop responsive
+    if (Date.now() - lastSortYield > 20 || sortIdx % 200 === 0) {
       await new Promise(resolve => setImmediate(resolve));
+      lastSortYield = Date.now();
     }
+    sortIdx++;
 
     // Sort by score desc, then by length (prefer shorter valid ones if scores tie)
     candidates.sort((a, b) => b.score - a.score);
@@ -246,7 +280,7 @@ function isValidContext(sentence) {
 /**
  * Scores a sentence based on quality
  */
-function scoreSentence(sentence, targetWord) {
+function scoreSentence(sentence, targetWord, preLowerWord, trimmedLower) {
   let score = 0;
   const trimmed = sentence.trim();
 
@@ -258,19 +292,20 @@ function scoreSentence(sentence, targetWord) {
   else score -= 1; // Penalize fragmented sentences
 
   // 3. Length preference: 10-30 words is sweet spot
-  const words = trimmed.split(/\s+/).length;
+  const spaces = trimmed.match(/\s+/g);
+  const words = spaces ? spaces.length + 1 : 1;
   if (words >= 10 && words <= 30) score += 2;
   else if (words > 30) score += 0; // Neutral
   else score -= 1; // Slightly short
 
   // 4. Position: Target word is not at the very edges (more context)
-  // Only rough check since tokenization might vary
-  if (!trimmed.toLowerCase().startsWith(targetWord.toLowerCase()) &&
-    !trimmed.toLowerCase().endsWith(targetWord.toLowerCase())) {
+  const lowerText = trimmedLower !== undefined ? trimmedLower : trimmed.toLowerCase();
+  const lowerWord = preLowerWord !== undefined ? preLowerWord : targetWord.toLowerCase();
+  if (!lowerText.startsWith(lowerWord) && !lowerText.endsWith(lowerWord)) {
     score += 1;
   }
 
   return score;
 }
 
-module.exports = { analyzeWordFrequency, extractContexts };
+module.exports = { analyzeWordFrequency, extractContexts, isValidContext, scoreSentence };

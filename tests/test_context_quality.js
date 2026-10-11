@@ -16,35 +16,39 @@ This is a perfectly good sentence about a fox.
 bad context fox
 `;
 
-const contexts = extractContexts(noisyText, [targetWord], { caseSensitive: false });
-const results = contexts.get(targetWord);
+async function run() {
+    const contexts = await extractContexts(noisyText, [targetWord], { caseSensitive: false });
+    const results = contexts.get(targetWord);
 
-console.log('\nSelected Contexts:');
-results.forEach((c, i) => console.log(`${i + 1}. ${c}`));
+    console.log('\nSelected Contexts:');
+    results.forEach((c, i) => console.log(`${i + 1}. ${c}`));
 
-// Tests
-try {
-    // 1. Check garbage removal
-    const hasGarbage = results.some(c => c.includes('.......'));
-    assert.strictEqual(hasGarbage, false, '❌ Garbage "......" should be filtered out');
-    console.log('✅ Passed: Garbage filtering');
+    // Tests
+    try {
+        // 1. Check garbage removal
+        const hasGarbage = results.some(c => c.includes('.......'));
+        assert.strictEqual(hasGarbage, false, '❌ Garbage "......" should be filtered out');
+        console.log('✅ Passed: Garbage filtering');
 
-    // 2. Check long sentence removal (Lorem Ipsum)
-    const hasLorem = results.some(c => c.startsWith('Lorem ipsum'));
-    assert.strictEqual(hasLorem, false, '❌ Long Lorem Ipsum text should be filtered out');
-    console.log('✅ Passed: Length filtering');
+        // 2. Check long sentence removal (Lorem Ipsum)
+        const hasLorem = results.some(c => c.startsWith('Lorem ipsum'));
+        assert.strictEqual(hasLorem, false, '❌ Long Lorem Ipsum text should be filtered out');
+        console.log('✅ Passed: Length filtering');
 
-    // 3. Check prioritization (Best sentence first)
-    // "The quick brown fox..." starts with Capital, ends with dot, good length.
-    // "This is a perfectly good sentence about a fox." is also good.
-    const first = results[0];
-    assert.ok(/^[A-T]/.test(first), '❌ First result should be capitalized');
-    assert.ok(first.length > 20, '❌ First result should have decent length');
-    console.log('✅ Passed: Scoring prioritization');
+        // 3. Check prioritization (Best sentence first)
+        // "The quick brown fox..." starts with Capital, ends with dot, good length.
+        // "This is a perfectly good sentence about a fox." is also good.
+        const first = results[0];
+        assert.ok(/^[A-T]/.test(first), '❌ First result should be capitalized');
+        assert.ok(first.length > 20, '❌ First result should have decent length');
+        console.log('✅ Passed: Scoring prioritization');
 
-} catch (e) {
-    console.error(e.message);
-    process.exit(1);
+    } catch (e) {
+        console.error(e.message);
+        process.exit(1);
+    }
+
+    console.log('\n🎉 All Context Quality Tests Passed!');
 }
 
-console.log('\n🎉 All Context Quality Tests Passed!');
+run();

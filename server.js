@@ -49,6 +49,10 @@ const upload = multer({
     }
 });
 
+// Enable response compression (gzip/deflate)
+const compression = require('compression');
+app.use(compression({ threshold: 1024, level: 6 }));
+
 // Serve static files
 // TODO: Remove no-cache headers in production. Only needed for hot reload during development via tunnel.
 // Serve static files with no-cache headers for "hot reload" over tunnel
@@ -78,8 +82,19 @@ app.get('/api/health', (req, res) => {
     res.json({ status: 'ok', message: 'Word Frequency Analyzer API' });
 });
 
-// In-memory cache for analysis results
+// In-memory cache for analysis results (bounded to max 50 entries)
+const MAX_CACHE_ENTRIES = 50;
 const resultsCache = new Map();
+const origResultsCacheSet = resultsCache.set.bind(resultsCache);
+resultsCache.set = function (key, value) {
+    if (this.has(key)) {
+        this.delete(key);
+    } else if (this.size >= MAX_CACHE_ENTRIES) {
+        const oldestKey = this.keys().next().value;
+        this.delete(oldestKey);
+    }
+    return origResultsCacheSet(key, value);
+};
 
 
 // Status endpoint for polling
@@ -212,30 +227,21 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
         // 0. Calculate Hash & Check Cache
         const fileHash = await calculateFileHash(filePath);
         const cacheDir = path.join(__dirname, 'uploads', 'cache');
-        try {
-            await fs.promises.access(cacheDir);
-        } catch {
-            await fs.promises.mkdir(cacheDir, { recursive: true });
-        }
 
         const cachePath = path.join(cacheDir, `${fileHash}.txt`);
         const fullCachePath = path.join(cacheDir, `${fileHash}.json`);
         let text = '';
 
         // 1. Check Full Result Cache (INSTANT RESPONSE)
-        let hasFullCache = false;
         try {
-            await fs.promises.access(fullCachePath);
-            hasFullCache = true;
-        } catch { }
-
-        if (hasFullCache) {
-            console.log(`🚀 Full analysis cache hit for ${fileName} (${fileHash})`);
             const fileContent = await fs.promises.readFile(fullCachePath, 'utf8');
+            console.log(`🚀 Full analysis cache hit for ${fileName} (${fileHash})`);
             const analysis = JSON.parse(fileContent);
 
             // Clean up original upload
-            if (fs.existsSync(filePath)) await fs.promises.unlink(filePath);
+            try {
+                await fs.promises.unlink(filePath);
+            } catch { }
 
             resultsCache.set(fileId, {
                 status: 'complete',
@@ -250,19 +256,21 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
                 analysis,
                 status: 'complete'
             });
+        } catch (err) {
+            if (err.code !== 'ENOENT') {
+                console.warn(`Warning reading fullCachePath: ${err.message}`);
+            }
         }
 
         // 2. Check Text Cache
-        let hasTextCache = false;
         try {
-            await fs.promises.access(cachePath);
-            hasTextCache = true;
-        } catch { }
-
-        if (hasTextCache) {
-            console.log(`⚡ Text cache hit for ${fileName} (${fileHash}). Reading text...`);
             text = await fs.promises.readFile(cachePath, 'utf8');
-        } else {
+            console.log(`⚡ Text cache hit for ${fileName} (${fileHash}). Reading text...`);
+        } catch (err) {
+            if (err.code !== 'ENOENT') {
+                console.warn(`Warning reading cachePath: ${err.message}`);
+            }
+
             // Parse file
             const parseStart = Date.now();
             console.log(`📄 Parsing file: ${fileName}...`);
@@ -271,13 +279,18 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
 
             // Save to cache
             if (text && text.trim().length > 0) {
+                try {
+                    await fs.promises.mkdir(cacheDir, { recursive: true });
+                } catch { }
                 await fs.promises.writeFile(cachePath, text);
                 console.log(`💾 Saved parsed text to cache: ${fileHash}`);
             }
         }
 
         // Clean up original upload after parsing/cache check
-        if (fs.existsSync(filePath)) await fs.promises.unlink(filePath);
+        try {
+            await fs.promises.unlink(filePath);
+        } catch { }
 
         if (!text || text.trim().length === 0) {
             return res.status(400).json({ error: 'No text content found in file' });
@@ -364,7 +377,9 @@ app.post('/api/analysis/process-batch', async (req, res) => {
 // Start server
 async function start() {
     try {
-        PORT = await registerPort();
+        if (!process.env.PORT) {
+            PORT = await registerPort();
+        }
     } catch (e) {
         console.error('[PortManager] Failed to register port, using default:', PORT);
     }

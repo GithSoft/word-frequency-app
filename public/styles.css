@@ -1160,6 +1160,154 @@ body {
   font-weight: 500;
 }
 
+/* Source Icon Badges */
+.source-icon-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  cursor: help;
+  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.2s ease;
+  vertical-align: middle;
+  margin-left: 8px;
+  position: relative;
+  flex-shrink: 0;
+}
+
+.source-icon-badge:hover {
+  transform: scale(1.1);
+}
+
+.lingoes-badge {
+  background: linear-gradient(135deg, #6366f1 0%, #a855f7 50%, #ec4899 100%);
+  box-shadow: 0 2px 6px rgba(168, 85, 247, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.lingoes-badge:hover {
+  box-shadow: 0 3px 10px rgba(236, 72, 153, 0.45);
+}
+
+.wiktionary-badge {
+  background: linear-gradient(135deg, #0284c7 0%, #0d9488 100%);
+  box-shadow: 0 2px 6px rgba(13, 148, 136, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.wiktionary-badge:hover {
+  box-shadow: 0 3px 10px rgba(13, 148, 136, 0.45);
+}
+
+.datamuse-badge {
+  background: linear-gradient(135deg, #f59e0b 0%, #ea580c 100%);
+  box-shadow: 0 2px 6px rgba(234, 88, 12, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.datamuse-badge:hover {
+  box-shadow: 0 3px 10px rgba(234, 88, 12, 0.45);
+}
+
+.default-source-badge {
+  background: linear-gradient(135deg, #64748b 0%, #475569 100%);
+  box-shadow: 0 2px 6px rgba(71, 85, 105, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+/* Clickable Lemma Badge */
+.lemma-wrapper {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.85rem;
+  font-weight: normal;
+  color: #94a3b8;
+  margin-left: 8px;
+  vertical-align: middle;
+}
+
+.lemma-badge-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  background: rgba(167, 139, 250, 0.15);
+  color: #c4b5fd;
+  border: 1px solid rgba(167, 139, 250, 0.4);
+  padding: 1px 8px;
+  border-radius: 4px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  margin-left: 4px;
+  transition: all 0.2s ease;
+  font-family: inherit;
+  line-height: 1.4;
+}
+
+.lemma-badge-btn:hover {
+  background: rgba(167, 139, 250, 0.35);
+  color: #ffffff;
+  border-color: #a78bfa;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(167, 139, 250, 0.25);
+}
+
+.lemma-badge-btn:active {
+  transform: translateY(0);
+}
+
+/* Lemma Context Hint & Quick Action */
+.lemma-context-hint {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  background: rgba(167, 139, 250, 0.12);
+  border: 1px solid rgba(167, 139, 250, 0.35);
+  border-left: 4px solid #a78bfa;
+  padding: 10px 14px;
+  border-radius: 8px;
+  margin-bottom: 1rem;
+  color: #e2e8f0;
+  font-size: 0.92rem;
+  line-height: 1.5;
+}
+
+.lemma-context-hint strong {
+  color: #c4b5fd;
+  font-weight: 600;
+}
+
+.btn-subtle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(167, 139, 250, 0.2);
+  color: #ede9fe;
+  border: 1px solid rgba(167, 139, 250, 0.5);
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.btn-subtle:hover {
+  background: rgba(167, 139, 250, 0.4);
+  color: #ffffff;
+  border-color: #c4b5fd;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(167, 139, 250, 0.3);
+}
+
+.btn-subtle:active {
+  transform: translateY(0);
+}
+
 .badge-dict {
   background: rgba(59, 130, 246, 0.2);
   color: #93c5fd;
@@ -1273,12 +1421,16 @@ body {
 
 /* Definition Styles */
 .section-title {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
   font-size: 1.1rem;
   font-weight: 600;
   color: #fff;
   margin: 1.5rem 0 0.5rem 0;
   border-bottom: 2px solid rgba(167, 139, 250, 0.3);
-  padding-bottom: 4px;
+  padding-bottom: 6px;
 }
 
 .definitions-section {
@@ -1291,13 +1443,17 @@ body {
 
 .part-of-speech {
   display: inline-block;
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(167, 139, 250, 0.15);
+  border: 1px solid rgba(167, 139, 250, 0.3);
   padding: 2px 8px;
   border-radius: 4px;
-  font-size: 0.8rem;
-  font-style: italic;
-  color: #a78bfa;
-  margin-bottom: 4px;
+  font-size: 0.78rem;
+  font-weight: 500;
+  font-style: normal;
+  color: #c4b5fd;
+  margin-top: 2px;
+  margin-bottom: 6px;
+  letter-spacing: 0.2px;
 }
 
 .def-list {

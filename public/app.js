@@ -831,11 +831,66 @@ function renderContextItem(c, word) {
     // source === 'document'
     const tooltipText = `(File: ${escapeHtml(fileName)} | Dòng: ${line}${page > 1 ? ` | Trang: ${page}` : ''})`;
     const provenanceHtml = `<span class="context-provenance" title="${tooltipText}"><span class="provenance-icon">ℹ️</span><span class="provenance-tooltip">${tooltipText}</span></span>`;
-
     return `<div class="context-item context-document">
         <span class="context-text">${highlighted}</span>
         ${provenanceHtml}
     </div>`;
+}
+
+function renderSourceBadge(source) {
+    if (!source || source === 'none') return '';
+    if (source === 'offline_lingoes') {
+        return `<span class="source-icon-badge lingoes-badge" title="Từ điển Lingoes Offline (108.852 từ)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5Z"></path><path d="M9 7v7h4" stroke-width="2.6"></path></svg></span>`;
+    }
+    if (source === 'online_wiktionary') {
+        return `<span class="source-icon-badge wiktionary-badge" title="Wiktionary Online Backup"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5Z"></path><path d="M8 8l2 6 2-6 2 6 2-6" stroke-width="2"></path></svg></span>`;
+    }
+    if (source === 'online_datamuse') {
+        return `<span class="source-icon-badge datamuse-badge" title="Datamuse Online Backup"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"></path></svg></span>`;
+    }
+    return `<span class="source-icon-badge default-source-badge" title="${escapeHtml(source)}"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5Z"></path></svg></span>`;
+}
+
+function renderLemmaBadge(lemma) {
+    if (!lemma) return '';
+    const escaped = escapeHtml(lemma);
+    return `<span class="lemma-wrapper">
+        (Nguyên mẫu: <button type="button" class="lemma-badge-btn" onclick="showContext('${escaped}')" title="Tra từ nguyên mẫu '${escaped}'">${escaped} ↗</button>)
+    </span>`;
+}
+
+function renderMeaningsHtml(meanings) {
+    if (!meanings || meanings.length === 0) {
+        return '<p class="no-data">No definitions found.</p>';
+    }
+
+    const grouped = {};
+    meanings.forEach(m => {
+        let pos = (m.pos || 'nghĩa').trim();
+        if (pos.toLowerCase() === 'general') {
+            pos = 'Chung';
+        }
+        if (!grouped[pos]) grouped[pos] = [];
+        grouped[pos].push(m.def);
+    });
+
+    const groupEntries = Object.entries(grouped);
+    const hasSingleGeneralGroup = groupEntries.length === 1 && groupEntries[0][0] === 'Chung';
+
+    let html = '';
+    for (const [pos, defs] of groupEntries) {
+        html += `<div class="definition-group">
+            ${hasSingleGeneralGroup ? '' : `<span class="part-of-speech">${escapeHtml(pos)}</span>`}
+            <ul class="def-list">${defs.slice(0, 4).map(d => `<li>${escapeHtml(d)}</li>`).join('')}</ul>
+        </div>`;
+    }
+    return html;
+}
+
+function renderLemmaContextHint(lemma, count) {
+    if (!lemma || !count) return '';
+    const escaped = escapeHtml(lemma);
+    return `<div class="lemma-context-hint">💡 Tài liệu có ${count} câu chứa từ nguyên mẫu <strong>${escaped}</strong>. <button type="button" class="btn-subtle" onclick="showContext('${escaped}')">Xem ngay ↗</button></div>`;
 }
 
 async function showContext(word) {
@@ -917,19 +972,13 @@ async function showContext(word) {
             const res = await fetch(`/api/dictionary/${encodeURIComponent(word)}`);
             const dict = await res.json();
 
-            let sourceBadge = '';
-            if (dict.success && dict.source) {
-                if (dict.source === 'offline_lingoes') sourceBadge = '[Offline Lingoes]';
-                else if (dict.source === 'online_wiktionary') sourceBadge = '[Wiktionary]';
-                else if (dict.source === 'online_datamuse') sourceBadge = '[Datamuse]';
-                else if (dict.source === 'wordnet') sourceBadge = '[WordNet]';
-                else if (dict.source !== 'none') sourceBadge = `[${dict.source}]`;
-            }
+            const sourceBadgeHtml = (dict.success && dict.source) ? renderSourceBadge(dict.source) : '';
+            const lemmaBadgeHtml = dict.lemma ? renderLemmaBadge(dict.lemma) : '';
 
             let defHtml = `<div class="section-title">
-                Definitions
-                ${sourceBadge ? `<span class="badge badge-source">${escapeHtml(sourceBadge)}</span>` : ''}
-                ${dict.lemma ? `<span style="font-size:0.85rem; font-weight:normal; color:#94a3b8; margin-left:8px;">(Nguyên mẫu: <em>${escapeHtml(dict.lemma)}</em>)</span>` : ''}
+                <span>Definitions</span>
+                ${sourceBadgeHtml}
+                ${lemmaBadgeHtml}
             </div>`;
 
             if (dict.phonetic) {
@@ -940,44 +989,50 @@ async function showContext(word) {
                     </div>`;
             }
 
-            if (dict.meanings && dict.meanings.length > 0) {
-                const grouped = {};
-                dict.meanings.forEach(m => {
-                    const pos = m.pos || 'nghĩa';
-                    if (!grouped[pos]) grouped[pos] = [];
-                    grouped[pos].push(m.def);
-                });
-
-                for (const [pos, defs] of Object.entries(grouped)) {
-                    defHtml += `<div class="definition-group">
-                        <span class="part-of-speech">${escapeHtml(pos)}</span>
-                        <ul class="def-list">${defs.slice(0, 4).map(d => `<li>${escapeHtml(d)}</li>`).join('')}</ul>
-                    </div>`;
-                }
-            } else {
-                defHtml += '<p class="no-data">No definitions found.</p>';
-            }
+            defHtml += renderMeaningsHtml(dict.meanings);
 
             const defContainer = document.getElementById('definitionsContainer');
             if (defContainer) defContainer.innerHTML = defHtml;
 
-            // Step 3 requirement: If document does not have context, automatically populate example sentences from dictionary
+            // Context section check and lemma suggestion
             const cContainer = document.getElementById('contextsContainer');
-            if (cContainer && dict.examples && dict.examples.length > 0) {
+            if (cContainer) {
                 const currentText = cContainer.textContent || '';
-                const hasNoDocContext = currentText.includes('No context examples found') ||
+                const hasDocContext = item && item.context && item.context.some(c => c.source !== 'dictionary');
+                const hasNoDocContext = !hasDocContext ||
+                                        currentText.includes('No context examples found') ||
                                         currentText.includes('Custom added word') ||
                                         currentText.includes('Analysis in progress');
-                if (hasNoDocContext || (item && (!item.context || item.context.length === 0))) {
-                    const dictContexts = dict.examples.map(ex => ({
-                        text: ex.en || ex.example,
-                        translation: ex.vi || '',
-                        source: 'dictionary',
-                        dictName: 'Lingoes'
-                    }));
-                    if (item) item.context = dictContexts;
-                    cContainer.innerHTML = '<div class="section-title">Context Examples</div>' +
-                        dictContexts.map(c => renderContextItem(c, word)).join('');
+
+                let lemmaHintHtml = '';
+                if (hasNoDocContext && dict.lemma) {
+                    const aggData = typeof getAggregatedData === 'function' ? getAggregatedData() : null;
+                    const lemmaItem = aggData?.results?.find(i => i.word.toLowerCase() === dict.lemma.toLowerCase());
+                    const lemmaContextCount = (lemmaItem && lemmaItem.context)
+                        ? (lemmaItem.context.filter(c => c.source !== 'dictionary').length || lemmaItem.context.length)
+                        : 0;
+                    if (lemmaItem && lemmaContextCount > 0) {
+                        lemmaHintHtml = renderLemmaContextHint(dict.lemma, lemmaContextCount);
+                    }
+                }
+
+                if (hasNoDocContext) {
+                    if (dict.examples && dict.examples.length > 0) {
+                        const dictContexts = dict.examples.map(ex => ({
+                            text: ex.en || ex.example,
+                            translation: ex.vi || '',
+                            source: 'dictionary',
+                            dictName: 'Lingoes'
+                        }));
+                        if (item) item.context = dictContexts;
+                        cContainer.innerHTML = '<div class="section-title">Context Examples</div>' +
+                            lemmaHintHtml +
+                            dictContexts.map(c => renderContextItem(c, word)).join('');
+                    } else if (lemmaHintHtml) {
+                        cContainer.innerHTML = '<div class="section-title">Context Examples</div>' +
+                            lemmaHintHtml +
+                            '<div class="context-item">No context examples found for this word.</div>';
+                    }
                 }
             }
         } catch (err) {
@@ -992,6 +1047,20 @@ async function showContext(word) {
 
 window.showContext = showContext;
 window.speakWord = speakWord;
+window.renderSourceBadge = renderSourceBadge;
+window.renderLemmaBadge = renderLemmaBadge;
+window.renderMeaningsHtml = renderMeaningsHtml;
+window.renderLemmaContextHint = renderLemmaContextHint;
+
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = {
+        renderSourceBadge,
+        renderLemmaBadge,
+        renderMeaningsHtml,
+        renderLemmaContextHint,
+        escapeHtml
+    };
+}
 
 // Modal close handlers
 document.getElementById('closeModalBtn').addEventListener('click', () => {
@@ -1217,7 +1286,9 @@ async function loadCard() {
         dictResult = await res.json();
         if (dictResult && dictResult.meanings && dictResult.meanings.length > 0) {
             const firstMeaning = dictResult.meanings[0];
-            const posPrefix = firstMeaning.pos ? `(${firstMeaning.pos}) ` : '';
+            let posText = (firstMeaning.pos || '').trim();
+            if (posText.toLowerCase() === 'general') posText = '';
+            const posPrefix = posText ? `(${posText}) ` : '';
             fcDefinition.textContent = `${posPrefix}${firstMeaning.def}`;
         } else {
             fcDefinition.textContent = 'No definition found.';

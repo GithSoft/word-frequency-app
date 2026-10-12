@@ -1,6 +1,43 @@
 const assert = require('assert');
+const fs = require('fs');
+const path = require('path');
+const vm = require('vm');
 const dictService = require('../src/dictionary-service');
 const { extractContexts } = require('../src/analyzer');
+
+function loadAppJs() {
+    const appJsCode = fs.readFileSync(path.join(__dirname, '../public/app.js'), 'utf8');
+    const fakeEl = {
+        addEventListener: () => {},
+        classList: { add: () => {}, remove: () => {} },
+        style: {},
+        innerHTML: '',
+        textContent: '',
+        value: '',
+        appendChild: () => {},
+        setAttribute: () => {}
+    };
+    const sandbox = {
+        window: {},
+        document: {
+            getElementById: () => fakeEl,
+            querySelector: () => fakeEl,
+            querySelectorAll: () => [],
+            createElement: () => fakeEl,
+            addEventListener: () => {},
+            body: fakeEl
+        },
+        localStorage: { getItem: () => null, setItem: () => null },
+        setTimeout: () => {},
+        clearTimeout: () => {},
+        console: console,
+        fetch: () => Promise.resolve({ json: () => ({}) })
+    };
+    sandbox.window = sandbox;
+    vm.createContext(sandbox);
+    vm.runInContext(appJsCode, sandbox);
+    return sandbox;
+}
 
 console.log('🧪 Starting Multi-Tier Smart Dictionary & Context Provenance Tests...\n');
 
@@ -179,9 +216,86 @@ Line 6 concludes this document section.`;
         console.log('Fallback example:', JSON.stringify(wordContexts[0]));
         console.log('✅ Test 6 Passed: Dictionary fallback example populated successfully.\n');
 
+        // -------------------------------------------------------------
+        // Test 7: Compact SVG Source Icon Rendering
+        // -------------------------------------------------------------
+        console.log('--- Test 7: Compact SVG source icon rendering ---');
+        const app = loadAppJs();
+        const lingoesBadge = app.renderSourceBadge('offline_lingoes');
+        const wiktionaryBadge = app.renderSourceBadge('online_wiktionary');
+        const datamuseBadge = app.renderSourceBadge('online_datamuse');
+        const emptyBadge = app.renderSourceBadge('none');
+
+        assert.ok(lingoesBadge.includes('source-icon-badge lingoes-badge'), 'Lingoes badge should have source-icon-badge and lingoes-badge classes');
+        assert.ok(lingoesBadge.includes('title="Từ điển Lingoes Offline (108.852 từ)"'), 'Lingoes badge should have descriptive hover tooltip');
+        assert.ok(lingoesBadge.includes('<svg') && lingoesBadge.includes('</svg>'), 'Lingoes badge should contain sleek SVG icon');
+
+        assert.ok(wiktionaryBadge.includes('source-icon-badge wiktionary-badge'), 'Wiktionary badge should have wiktionary-badge class');
+        assert.ok(wiktionaryBadge.includes('title="Wiktionary Online Backup"'), 'Wiktionary badge should have online backup tooltip');
+        assert.ok(wiktionaryBadge.includes('<svg') && wiktionaryBadge.includes('</svg>'), 'Wiktionary badge should contain SVG icon');
+
+        assert.ok(datamuseBadge.includes('source-icon-badge datamuse-badge'), 'Datamuse badge should have datamuse-badge class');
+        assert.ok(datamuseBadge.includes('title="Datamuse Online Backup"'), 'Datamuse badge should have datamuse tooltip');
+        assert.ok(datamuseBadge.includes('<svg') && datamuseBadge.includes('</svg>'), 'Datamuse badge should contain SVG icon');
+
+        assert.strictEqual(emptyBadge, '', 'Source "none" or empty should render no badge');
+        console.log('Lingoes Icon Badge snippet:', lingoesBadge.substring(0, 100) + '...');
+        console.log('✅ Test 7 Passed: Compact SVG source icons rendered with hover tooltips.\n');
+
+        // -------------------------------------------------------------
+        // Test 8: Clickable Lemma Button & Clean POS Mapping
+        // -------------------------------------------------------------
+        console.log('--- Test 8: Clickable Lemma button & Clean POS mapping ---');
+        const lemmaBadge = app.renderLemmaBadge('reality');
+        assert.ok(lemmaBadge.includes('lemma-wrapper'), 'Lemma badge should be wrapped in lemma-wrapper');
+        assert.ok(lemmaBadge.includes('class="lemma-badge-btn"'), 'Lemma link should have lemma-badge-btn class');
+        assert.ok(lemmaBadge.includes(`onclick="showContext('reality')"`), 'Lemma button should navigate to showContext(dict.lemma)');
+        assert.ok(lemmaBadge.includes('reality ↗'), 'Lemma button should display lemma text with arrow indicator');
+
+        // Test escaping
+        const escapedLemma = app.renderLemmaBadge('rock & roll');
+        assert.ok(escapedLemma.includes('rock &amp; roll'), 'Special characters should be escaped in lemma badge');
+
+        // Test POS display mapping
+        // 1. Single group with 'general' should omit redundant tag so it doesn't concatenate with definition text
+        const singleGeneralHtml = app.renderMeaningsHtml([{ pos: 'general', def: 'tính thực, thực tế' }]);
+        assert.ok(!singleGeneralHtml.includes('part-of-speech'), 'Single general POS should be omitted to avoid redundant tag');
+        assert.ok(!singleGeneralHtml.includes('general'), 'Should not contain raw English "general" tag');
+        assert.ok(singleGeneralHtml.includes('tính thực, thực tế'), 'Definition text should be preserved');
+
+        // 2. Multiple groups with 'general' should map to 'Chung'
+        const multiGroupHtml = app.renderMeaningsHtml([
+            { pos: 'general', def: 'nghĩa tổng quan' },
+            { pos: 'noun', def: 'danh từ ví dụ' }
+        ]);
+        assert.ok(multiGroupHtml.includes('>Chung</span>'), '"general" POS should map to "Chung" when multiple groups exist');
+        assert.ok(multiGroupHtml.includes('>noun</span>'), 'Other POS tags should remain');
+
+        console.log('Lemma Link Button snippet:', lemmaBadge.trim());
+        console.log('Single General Meanings HTML:', singleGeneralHtml.trim().replace(/\s+/g, ' '));
+        console.log('✅ Test 8 Passed: Clickable lemma link and clean POS mapping verified.\n');
+
+        // -------------------------------------------------------------
+        // Test 9: Lemma Document Context Quick-Action Suggestion Callout
+        // -------------------------------------------------------------
+        console.log('--- Test 9: Lemma context quick-action suggestion callout ---');
+        const hintHtml = app.renderLemmaContextHint('reality', 4);
+        assert.ok(hintHtml.includes('class="lemma-context-hint"'), 'Suggestion should have lemma-context-hint class');
+        assert.ok(hintHtml.includes('Tài liệu có 4 câu chứa từ nguyên mẫu <strong>reality</strong>'), 'Should display sentence count and lemma');
+        assert.ok(hintHtml.includes('class="btn-subtle"'), 'Action button should have btn-subtle class');
+        assert.ok(hintHtml.includes(`onclick="showContext('reality')"`), 'Action button should navigate to showContext(dict.lemma)');
+        assert.ok(hintHtml.includes('Xem ngay ↗'), 'Action button should display "Xem ngay ↗"');
+
+        // Missing params should return empty string
+        assert.strictEqual(app.renderLemmaContextHint('', 4), '', 'Empty lemma should return empty string');
+        assert.strictEqual(app.renderLemmaContextHint('reality', 0), '', 'Zero count should return empty string');
+
+        console.log('Lemma Context Suggestion snippet:', hintHtml);
+        console.log('✅ Test 9 Passed: Lemma context suggestion quick-action callout verified.\n');
+
         await dictService.close();
 
-        console.log('🎉 ALL 6 DICTIONARY & PROVENANCE TESTS PASSED!\n');
+        console.log('🎉 ALL 9 DICTIONARY, LEMMA UI & PROVENANCE TESTS PASSED!\n');
         process.exit(0);
 
     } catch (err) {

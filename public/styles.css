@@ -1184,32 +1184,39 @@ body {
   visibility: hidden;
   opacity: 0;
   position: absolute;
-  bottom: calc(100% + 6px);
-  left: 50%;
-  transform: translateX(-50%);
-  background: rgba(15, 23, 42, 0.95);
+  top: calc(100% + 8px);
+  bottom: auto;
+  left: 0;
+  transform: none;
+  background: rgba(15, 23, 42, 0.96);
   color: #f8fafc;
   font-size: 0.75rem;
   font-weight: 500;
-  padding: 4px 10px;
+  padding: 6px 10px;
   border-radius: 6px;
-  white-space: nowrap;
+  width: max-content;
+  max-width: 290px;
+  white-space: normal;
+  word-wrap: break-word;
+  line-height: 1.35;
+  text-align: left;
   pointer-events: none;
   z-index: 9999;
   border: 1px solid rgba(255, 255, 255, 0.15);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
   transition: opacity 0.15s ease, visibility 0.15s ease;
 }
 
 .source-icon-badge .badge-tooltip::after {
   content: '';
   position: absolute;
-  top: 100%;
-  left: 50%;
-  margin-left: -5px;
+  bottom: 100%;
+  top: auto;
+  left: 8px;
+  margin-left: 0;
   border-width: 5px;
   border-style: solid;
-  border-color: rgba(15, 23, 42, 0.95) transparent transparent transparent;
+  border-color: transparent transparent rgba(15, 23, 42, 0.96) transparent;
 }
 
 .source-icon-badge:hover .badge-tooltip {
@@ -1407,7 +1414,12 @@ body {
   border-radius: 6px;
   font-size: 0.75rem;
   font-weight: 500;
-  white-space: nowrap;
+  width: max-content;
+  max-width: 320px;
+  white-space: normal;
+  word-wrap: break-word;
+  line-height: 1.35;
+  text-align: center;
   z-index: 9999;
   pointer-events: none;
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5);

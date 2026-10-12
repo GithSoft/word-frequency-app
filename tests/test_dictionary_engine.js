@@ -247,8 +247,17 @@ Line 6 concludes this document section.`;
         assert.ok(datamuseBadge.includes('<svg') && datamuseBadge.includes('</svg>'), 'Datamuse badge should contain SVG icon');
 
         assert.strictEqual(emptyBadge, '', 'Source "none" or empty should render no badge');
+
+        // Verify CSS anti-clipping rules for tooltips
+        const cssContent = fs.readFileSync(path.join(__dirname, '../public/styles.css'), 'utf8');
+        assert.ok(cssContent.includes('.source-icon-badge .badge-tooltip'), 'CSS should define .source-icon-badge .badge-tooltip');
+        assert.ok(cssContent.includes('top: calc(100% + 8px);'), 'Tooltip should position downwards to prevent modal clipping');
+        assert.ok(cssContent.includes('max-width: 290px;'), 'Tooltip should have max-width constraint');
+        assert.ok(cssContent.includes('white-space: normal;'), 'Tooltip should allow wrapping');
+        assert.ok(cssContent.includes('max-width: 320px;'), 'Provenance tooltip should have max-width constraint');
+
         console.log('Lingoes Icon Badge snippet:', lingoesBadge.substring(0, 100) + '...');
-        console.log('✅ Test 7 Passed: Compact SVG source icons rendered with hover tooltips.\n');
+        console.log('✅ Test 7 Passed: Compact SVG source icons rendered with hover tooltips and unclipped positioning.\n');
 
         // -------------------------------------------------------------
         // Test 8: Clickable Lemma Button & Clean POS Mapping

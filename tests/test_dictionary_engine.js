@@ -229,6 +229,10 @@ Line 6 concludes this document section.`;
         assert.ok(lingoesBadge.includes('source-icon-badge lingoes-badge'), 'Lingoes badge should have source-icon-badge and lingoes-badge classes');
         assert.ok(lingoesBadge.includes('title="Từ điển Lingoes Offline (108.852 từ)"'), 'Lingoes badge should have descriptive hover tooltip');
         assert.ok(lingoesBadge.includes('<svg') && lingoesBadge.includes('</svg>'), 'Lingoes badge should contain sleek SVG icon');
+        assert.ok(lingoesBadge.includes('#22c55e'), 'Lingoes badge should feature green mascot body (#22c55e)');
+        assert.ok(lingoesBadge.includes('#f59e0b') || lingoesBadge.includes('#d97706'), 'Lingoes badge should feature yellow beak (#f59e0b / #d97706)');
+        assert.ok(lingoesBadge.includes('#0284c7') || lingoesBadge.includes('#38bdf8'), 'Lingoes badge should feature blue wing feathers (#0284c7 / #38bdf8)');
+        assert.ok(lingoesBadge.includes('width="16"') && lingoesBadge.includes('height="16"'), 'Lingoes badge SVG should be sized 16x16');
 
         assert.ok(wiktionaryBadge.includes('source-icon-badge wiktionary-badge'), 'Wiktionary badge should have wiktionary-badge class');
         assert.ok(wiktionaryBadge.includes('title="Wiktionary Online Backup"'), 'Wiktionary badge should have online backup tooltip');

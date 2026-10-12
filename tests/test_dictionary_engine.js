@@ -227,7 +227,9 @@ Line 6 concludes this document section.`;
         const emptyBadge = app.renderSourceBadge('none');
 
         assert.ok(lingoesBadge.includes('source-icon-badge lingoes-badge'), 'Lingoes badge should have source-icon-badge and lingoes-badge classes');
-        assert.ok(lingoesBadge.includes('title="Từ điển Lingoes Offline (108.852 từ)"'), 'Lingoes badge should have descriptive hover tooltip');
+        assert.ok(lingoesBadge.includes('title="Lingoes: Từ điển Anh - Việt (Lạc Việt / Hồ Ngọc Đức - 108.852 từ)"'), 'Lingoes badge should have descriptive hover tooltip');
+        assert.ok(lingoesBadge.includes('Lingoes: Từ điển Anh - Việt (Lạc Việt / Hồ Ngọc Đức'), 'Tooltip should contain full Lingoes dictionary name');
+        assert.ok(lingoesBadge.includes('class="badge-tooltip"'), 'Lingoes badge should contain badge-tooltip element');
         assert.ok(lingoesBadge.includes('<svg') && lingoesBadge.includes('</svg>'), 'Lingoes badge should contain sleek SVG icon');
         assert.ok(lingoesBadge.includes('#22c55e'), 'Lingoes badge should feature green mascot body (#22c55e)');
         assert.ok(lingoesBadge.includes('#f59e0b') || lingoesBadge.includes('#d97706'), 'Lingoes badge should feature yellow beak (#f59e0b / #d97706)');
@@ -235,11 +237,13 @@ Line 6 concludes this document section.`;
         assert.ok(lingoesBadge.includes('width="16"') && lingoesBadge.includes('height="16"'), 'Lingoes badge SVG should be sized 16x16');
 
         assert.ok(wiktionaryBadge.includes('source-icon-badge wiktionary-badge'), 'Wiktionary badge should have wiktionary-badge class');
-        assert.ok(wiktionaryBadge.includes('title="Wiktionary Online Backup"'), 'Wiktionary badge should have online backup tooltip');
+        assert.ok(wiktionaryBadge.includes('title="Wiktionary: Từ điển Quốc tế (Wikimedia CDN)"'), 'Wiktionary badge should have online backup tooltip');
+        assert.ok(wiktionaryBadge.includes('class="badge-tooltip"'), 'Wiktionary badge should contain badge-tooltip element');
         assert.ok(wiktionaryBadge.includes('<svg') && wiktionaryBadge.includes('</svg>'), 'Wiktionary badge should contain SVG icon');
 
         assert.ok(datamuseBadge.includes('source-icon-badge datamuse-badge'), 'Datamuse badge should have datamuse-badge class');
-        assert.ok(datamuseBadge.includes('title="Datamuse Online Backup"'), 'Datamuse badge should have datamuse tooltip');
+        assert.ok(datamuseBadge.includes('title="Datamuse: Từ điển Trực tuyến (Datamuse API)"'), 'Datamuse badge should have datamuse tooltip');
+        assert.ok(datamuseBadge.includes('class="badge-tooltip"'), 'Datamuse badge should contain badge-tooltip element');
         assert.ok(datamuseBadge.includes('<svg') && datamuseBadge.includes('</svg>'), 'Datamuse badge should contain SVG icon');
 
         assert.strictEqual(emptyBadge, '', 'Source "none" or empty should render no badge');

@@ -5,6 +5,7 @@ const path = require('path');
 const fs = require('fs');
 const { parseFile } = require('./src/parsers');
 const { analyzeWordFrequency, extractContexts } = require('./src/analyzer');
+const dictionaryService = require('./src/dictionary-service');
 
 const { registerPort } = require('./lib/port-manager');
 
@@ -121,6 +122,17 @@ app.delete('/api/analysis/:fileId', (req, res) => {
     }
 });
 
+// Dictionary lookup endpoint (offline-first multi-tier)
+app.get('/api/dictionary/:word', async (req, res) => {
+    try {
+        const result = await dictionaryService.lookup(req.params.word);
+        res.json({ success: true, ...result });
+    } catch (err) {
+        console.error('Error looking up dictionary word:', err);
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
 // On-demand context extraction endpoint
 app.get('/api/analysis/:fileId/context/:word', async (req, res) => {
     try {
@@ -136,21 +148,37 @@ app.get('/api/analysis/:fileId/context/:word', async (req, res) => {
             return res.json({ success: true, word: targetWord, context: existing.context });
         }
 
+        const fileName = result.fileName || 'document';
+        let contexts = [];
+
         if (result.cachePath) {
             try {
                 const text = await fs.promises.readFile(result.cachePath, 'utf8');
-                const contextMap = await extractContexts(text, [targetWord], { caseSensitive: false });
-                const contexts = contextMap.get(targetWord) || [];
-                if (existing) {
-                    existing.context = contexts;
-                }
-                return res.json({ success: true, word: targetWord, context: contexts });
+                const contextMap = await extractContexts(text, [targetWord], { fileName, caseSensitive: false });
+                contexts = (contextMap && contextMap.get(targetWord)) || [];
             } catch (readErr) {
                 console.warn('Failed reading cachePath for on-demand context:', readErr.message);
             }
         }
 
-        res.json({ success: true, word: targetWord, context: [] });
+        // If returned context is empty (e.g. custom word or count = 0):
+        if (!contexts || contexts.length === 0) {
+            const dictResult = await dictionaryService.lookup(targetWord);
+            if (dictResult && dictResult.examples && dictResult.examples.length > 0) {
+                contexts = dictResult.examples.map(ex => ({
+                    text: ex.en || ex.example,
+                    translation: ex.vi || '',
+                    source: 'dictionary',
+                    dictName: 'Lingoes'
+                }));
+            }
+        }
+
+        if (existing && contexts.length > 0) {
+            existing.context = contexts;
+        }
+
+        return res.json({ success: true, word: targetWord, context: contexts });
     } catch (err) {
         console.error('Error fetching on-demand context:', err);
         res.status(500).json({ error: 'Failed to extract context', message: err.message });
@@ -200,6 +228,7 @@ async function processNextInQueue() {
         const allWords = analysis.results.map(item => item.word);
 
         const contextMap = await extractContexts(text, allWords, {
+            fileName,
             caseSensitive: false,
             checkAbort: () => !resultsCache.has(fileId) // If removed from cache, abort
         });

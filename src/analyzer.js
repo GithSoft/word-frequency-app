@@ -22,6 +22,32 @@ const abbrRegex = /\b(Mr|Mrs|Ms|Dr|Prof|Sr|Jr|vs|etc|i\.e|e\.g)\.$/i;
 const singleLetterRegex = /\b[A-Za-z]\.$/;
 const numRegex = /\b\d+\.$/;
 
+function escapeRegExp(string) {
+  return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+class ContextItem {
+  constructor({ text, score = 0, source = 'document', fileName = 'document', line = 1, page = 1, isFallbackSnippet = false, translation = '' }) {
+    this.text = text;
+    this.source = source;
+    this.fileName = fileName;
+    this.line = line;
+    this.page = page;
+    if (score !== undefined) this.score = score;
+    if (isFallbackSnippet) this.isFallbackSnippet = true;
+    if (translation) this.translation = translation;
+  }
+  toString() { return this.text; }
+  valueOf() { return this.text; }
+  [Symbol.toPrimitive]() { return this.text; }
+  includes(...args) { return this.text.includes(...args); }
+  startsWith(...args) { return this.text.startsWith(...args); }
+  endsWith(...args) { return this.text.endsWith(...args); }
+  get length() { return this.text.length; }
+  slice(...args) { return this.text.slice(...args); }
+  indexOf(...args) { return this.text.indexOf(...args); }
+}
+
 /**
  * Generator that stitches sentence segments split incorrectly across abbreviations or decimal numbers
  * @param {string} rawText
@@ -29,10 +55,12 @@ const numRegex = /\b\d+\.$/;
 function* getStitchedSentences(rawText) {
   const segmenter = new Intl.Segmenter('en', { granularity: 'sentence' });
   let pending = '';
+  let pendingIndex = 0;
 
-  for (const { segment } of segmenter.segment(rawText)) {
+  for (const { segment, index } of segmenter.segment(rawText)) {
     if (!pending) {
       pending = segment;
+      pendingIndex = index;
       continue;
     }
 
@@ -44,13 +72,14 @@ function* getStitchedSentences(rawText) {
     if (isAbbr && nextStartsWordOrNum) {
       pending += segment;
     } else {
-      yield pending;
+      yield { sentence: pending, index: pendingIndex };
       pending = segment;
+      pendingIndex = index;
     }
   }
 
   if (pending) {
-    yield pending;
+    yield { sentence: pending, index: pendingIndex };
   }
 }
 
@@ -131,7 +160,7 @@ async function analyzeWordFrequency(text, options = {}) {
   const topWords = results.slice(0, isFinite(maxResults) ? maxResults : frequencyMap.size)
     .map(item => item.word);
 
-  const contextMap = await extractContexts(text, topWords, { caseSensitive });
+  const contextMap = await extractContexts(text, topWords, { caseSensitive, fileName: options.fileName });
 
   // Merge contexts
   if (contextMap) {
@@ -164,13 +193,35 @@ async function analyzeWordFrequency(text, options = {}) {
  * @param {string} text - The full text
  * @param {string[]} targetWords - Words to find context for
  * @param {object} options - Options
- * @returns {Map<string, string[]>} Map of word -> context sentences
+ * @returns {Map<string, Array>} Map of word -> context items
  */
 async function extractContexts(text, targetWords, options = {}) {
-  const { caseSensitive = false } = options;
-  const wordContexts = new Map(); // word -> Array<{ text: string, score: number }>
+  const { caseSensitive = false, fileName = 'document' } = options;
+  const wordContexts = new Map(); // word -> Array<ContextItem>
   const targetWordsNorm = caseSensitive ? targetWords : targetWords.map(w => w.toLowerCase());
   const targetSet = new Set(targetWordsNorm);
+
+  // Build newline index array and page index array (\f form feeds)
+  const newlinePositions = [];
+  const pagePositions = [];
+  for (let idx = 0; idx < text.length; idx++) {
+    if (text[idx] === '\n') newlinePositions.push(idx);
+    else if (text[idx] === '\f') pagePositions.push(idx);
+  }
+
+  function getLineAndPage(charIndex) {
+    let line = 1;
+    for (let idx = 0; idx < newlinePositions.length; idx++) {
+      if (newlinePositions[idx] < charIndex) line++;
+      else break;
+    }
+    let page = 1;
+    for (let idx = 0; idx < pagePositions.length; idx++) {
+      if (pagePositions[idx] < charIndex) page++;
+      else break;
+    }
+    return { line, page };
+  }
 
   // Preprocess text to handle PDF line breaks
   const sanitizedText = text.replace(/(?<!\n)\n(?!\n)/g, ' ');
@@ -178,7 +229,7 @@ async function extractContexts(text, targetWords, options = {}) {
   let i = 0;
   let lastYield = Date.now();
 
-  for (const sentence of getStitchedSentences(sanitizedText)) {
+  for (const item of getStitchedSentences(sanitizedText)) {
     // Check for abortion every 10 sentences to avoid overhead
     if (i % 10 === 0 && options.checkAbort && options.checkAbort()) {
       console.log('🛑 extractContexts: Abort signal received');
@@ -192,6 +243,9 @@ async function extractContexts(text, targetWords, options = {}) {
     }
     i++;
 
+    const sentence = typeof item === 'string' ? item : item.sentence;
+    const charIdx = typeof item === 'object' && item.index !== undefined ? item.index : 0;
+
     // 1. Hard Filter: Skip bad sentences immediately
     if (!isValidContext(sentence)) continue;
 
@@ -200,6 +254,8 @@ async function extractContexts(text, targetWords, options = {}) {
     const seenWordsInSentence = new Set();
     const trimmed = sentence.trim();
     const trimmedLower = sentenceLower.trim();
+
+    const { line, page } = getLineAndPage(charIdx);
 
     // Check each word in the sentence
     for (const word of wordsInSentence) {
@@ -216,7 +272,14 @@ async function extractContexts(text, targetWords, options = {}) {
         // 2. Collect candidates (limit to 50 to avoid memory bloat)
         if (contexts.length < 50) {
           const score = scoreSentence(sentence, word, word, trimmedLower);
-          contexts.push({ text: trimmed, score });
+          contexts.push(new ContextItem({
+            text: trimmed,
+            score,
+            source: 'document',
+            fileName: options.fileName || 'document',
+            line,
+            page
+          }));
         }
       }
     }
@@ -242,14 +305,51 @@ async function extractContexts(text, targetWords, options = {}) {
     const seen = new Set();
 
     for (const c of candidates) {
-      if (!seen.has(c.text)) {
-        seen.add(c.text);
-        unique.push(c.text);
+      const itemText = typeof c === 'string' ? c : c.text;
+      if (!seen.has(itemText)) {
+        seen.add(itemText);
+        const itemObj = typeof c === 'string'
+          ? new ContextItem({ text: c, source: 'document', fileName: options.fileName || 'document', line: 1, page: 1 })
+          : (c instanceof ContextItem ? c : new ContextItem(c));
+        unique.push(itemObj);
         if (unique.length >= 5) break;
       }
     }
 
     finalContexts.set(word, unique);
+  }
+
+  // 4. For low-frequency words (count >= 1) with 0 valid sentences:
+  // Add Fallback Context Window: search first occurrence of \b${word}\b in text, extract ~25 words (~140 chars) snippet around it
+  for (const rawTarget of targetWords) {
+    const wordKey = caseSensitive ? rawTarget : rawTarget.toLowerCase();
+    const existing = finalContexts.get(wordKey);
+    if (!existing || existing.length === 0) {
+      const regex = new RegExp(`\\b${escapeRegExp(rawTarget)}\\b`, caseSensitive ? '' : 'i');
+      const match = regex.exec(text);
+      if (match) {
+        const matchIdx = match.index;
+        const { line, page } = getLineAndPage(matchIdx);
+        const start = Math.max(0, matchIdx - 70);
+        const end = Math.min(text.length, matchIdx + match[0].length + 70);
+        let rawSnippet = text.slice(start, end).replace(/\s+/g, ' ').trim();
+        const snippet = (start > 0 ? '... ' : '') + rawSnippet + (end < text.length ? ' ...' : '');
+        const fallbackItem = new ContextItem({
+          text: snippet,
+          score: 0,
+          source: 'document',
+          fileName: options.fileName || 'document',
+          line,
+          page,
+          isFallbackSnippet: true
+        });
+        finalContexts.set(wordKey, [fallbackItem]);
+      } else {
+        if (!finalContexts.has(wordKey)) {
+          finalContexts.set(wordKey, []);
+        }
+      }
+    }
   }
 
   return finalContexts;
@@ -308,4 +408,4 @@ function scoreSentence(sentence, targetWord, preLowerWord, trimmedLower) {
   return score;
 }
 
-module.exports = { analyzeWordFrequency, extractContexts, isValidContext, scoreSentence };
+module.exports = { analyzeWordFrequency, extractContexts, isValidContext, scoreSentence, ContextItem };

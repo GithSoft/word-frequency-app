@@ -807,6 +807,37 @@ function speakWord(word) {
     window.speechSynthesis.speak(utterance);
 }
 
+function renderContextItem(c, word) {
+    const isString = typeof c === 'string';
+    const text = isString ? c : (c.text || '');
+    const source = isString ? 'document' : (c.source || 'document');
+    const fileName = isString ? 'tài liệu' : (c.fileName || 'tài liệu');
+    const line = isString ? 1 : (c.line || 1);
+    const page = isString ? 1 : (c.page || 1);
+    const translation = isString ? '' : (c.translation || '');
+
+    const regex = new RegExp(`\\b${escapeHtml(word)}\\b`, 'gi');
+    const highlighted = escapeHtml(text).replace(regex, match => `<strong>${match}</strong>`);
+
+    if (source === 'dictionary') {
+        return `<div class="context-item context-dict">
+            <div><span class="badge badge-dict">📖 Ví dụ từ điển</span></div>
+            <div class="dict-subtext">Ví dụ từ từ điển (không phải từ tài liệu)</div>
+            <div class="context-text">${highlighted}</div>
+            ${translation ? `<div class="example-translation">💡 ${escapeHtml(translation)}</div>` : ''}
+        </div>`;
+    }
+
+    // source === 'document'
+    const tooltipText = `(File: ${escapeHtml(fileName)} | Dòng: ${line}${page > 1 ? ` | Trang: ${page}` : ''})`;
+    const provenanceHtml = `<span class="context-provenance" title="${tooltipText}"><span class="provenance-icon">ℹ️</span><span class="provenance-tooltip">${tooltipText}</span></span>`;
+
+    return `<div class="context-item context-document">
+        <span class="context-text">${highlighted}</span>
+        ${provenanceHtml}
+    </div>`;
+}
+
 async function showContext(word) {
     const data = getAggregatedData();
     const item = data.results.find(i => i.word.toLowerCase() === word.toLowerCase()) || null;
@@ -830,10 +861,8 @@ async function showContext(word) {
     let contextHtml = '<div class="section-title">Context Examples</div>';
 
     if (contexts.length > 0) {
-        contexts.forEach(sentence => {
-            const regex = new RegExp(`\\b${escapeHtml(word)}\\b`, 'gi');
-            const highlighted = escapeHtml(sentence).replace(regex, match => `<strong>${match}</strong>`);
-            contextHtml += `<div class="context-item">${highlighted}</div>`;
+        contexts.forEach(c => {
+            contextHtml += renderContextItem(c, word);
         });
     } else if (item && item.isCustom) {
         contextHtml += '<div class="context-item info-message">Custom added word (no book context excerpt available).</div>';
@@ -871,10 +900,8 @@ async function showContext(word) {
                     if (res.success && res.context && res.context.length > 0) {
                         if (item) item.context = res.context;
                         let updatedContextHtml = '<div class="section-title">Context Examples</div>';
-                        res.context.forEach(sentence => {
-                            const regex = new RegExp(`\\b${escapeHtml(word)}\\b`, 'gi');
-                            const highlighted = escapeHtml(sentence).replace(regex, match => `<strong>${match}</strong>`);
-                            updatedContextHtml += `<div class="context-item">${highlighted}</div>`;
+                        res.context.forEach(c => {
+                            updatedContextHtml += renderContextItem(c, word);
                         });
                         const cContainer = document.getElementById('contextsContainer');
                         if (cContainer) cContainer.innerHTML = updatedContextHtml;
@@ -884,36 +911,80 @@ async function showContext(word) {
         }
     }
 
-    // Asynchronous Dictionary API fetch with 3-second timeout
+    // Offline-first Multi-Tier Dictionary fetch from local server endpoint
     (async () => {
         try {
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 3000);
-            const res = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(word)}`, {
-                signal: controller.signal
-            });
-            clearTimeout(timeoutId);
+            const res = await fetch(`/api/dictionary/${encodeURIComponent(word)}`);
+            const dict = await res.json();
 
-            const defs = await res.json();
-            let defHtml = '<div class="section-title">Definitions</div>';
-            if (Array.isArray(defs) && defs.length > 0 && defs[0].meanings) {
-                defs[0].meanings.forEach(m => {
-                    defHtml += `<div class="definition-group">
-                        <span class="part-of-speech">${escapeHtml(m.partOfSpeech)}</span>
-                        <ul class="def-list">${m.definitions.slice(0, 2).map(d => `<li>${escapeHtml(d.definition)}</li>`).join('')}</ul>
+            let sourceBadge = '';
+            if (dict.success && dict.source) {
+                if (dict.source === 'offline_lingoes') sourceBadge = '[Offline Lingoes]';
+                else if (dict.source === 'online_wiktionary') sourceBadge = '[Wiktionary]';
+                else if (dict.source === 'online_datamuse') sourceBadge = '[Datamuse]';
+                else if (dict.source === 'wordnet') sourceBadge = '[WordNet]';
+                else if (dict.source !== 'none') sourceBadge = `[${dict.source}]`;
+            }
+
+            let defHtml = `<div class="section-title">
+                Definitions
+                ${sourceBadge ? `<span class="badge badge-source">${escapeHtml(sourceBadge)}</span>` : ''}
+                ${dict.lemma ? `<span style="font-size:0.85rem; font-weight:normal; color:#94a3b8; margin-left:8px;">(Nguyên mẫu: <em>${escapeHtml(dict.lemma)}</em>)</span>` : ''}
+            </div>`;
+
+            if (dict.phonetic) {
+                defHtml += `
+                    <div class="phonetic-container" style="margin-bottom: 8px;">
+                        <span style="color:#a78bfa; font-weight:500;">/${escapeHtml(dict.phonetic.replace(/^\/+|\/+$/g, ''))}/</span>
+                        <button class="icon-btn" onclick="speakWord('${escapeHtml(dict.lemma || word)}')" title="Listen" style="font-size: 0.9rem; padding: 2px 4px; margin-left:4px;">🔊</button>
                     </div>`;
+            }
+
+            if (dict.meanings && dict.meanings.length > 0) {
+                const grouped = {};
+                dict.meanings.forEach(m => {
+                    const pos = m.pos || 'nghĩa';
+                    if (!grouped[pos]) grouped[pos] = [];
+                    grouped[pos].push(m.def);
                 });
+
+                for (const [pos, defs] of Object.entries(grouped)) {
+                    defHtml += `<div class="definition-group">
+                        <span class="part-of-speech">${escapeHtml(pos)}</span>
+                        <ul class="def-list">${defs.slice(0, 4).map(d => `<li>${escapeHtml(d)}</li>`).join('')}</ul>
+                    </div>`;
+                }
             } else {
                 defHtml += '<p class="no-data">No definitions found.</p>';
             }
 
             const defContainer = document.getElementById('definitionsContainer');
             if (defContainer) defContainer.innerHTML = defHtml;
+
+            // Step 3 requirement: If document does not have context, automatically populate example sentences from dictionary
+            const cContainer = document.getElementById('contextsContainer');
+            if (cContainer && dict.examples && dict.examples.length > 0) {
+                const currentText = cContainer.textContent || '';
+                const hasNoDocContext = currentText.includes('No context examples found') ||
+                                        currentText.includes('Custom added word') ||
+                                        currentText.includes('Analysis in progress');
+                if (hasNoDocContext || (item && (!item.context || item.context.length === 0))) {
+                    const dictContexts = dict.examples.map(ex => ({
+                        text: ex.en || ex.example,
+                        translation: ex.vi || '',
+                        source: 'dictionary',
+                        dictName: 'Lingoes'
+                    }));
+                    if (item) item.context = dictContexts;
+                    cContainer.innerHTML = '<div class="section-title">Context Examples</div>' +
+                        dictContexts.map(c => renderContextItem(c, word)).join('');
+                }
+            }
         } catch (err) {
-            console.warn('Dict fetch error/timeout:', err.message);
+            console.warn('Dict lookup error:', err.message);
             const defContainer = document.getElementById('definitionsContainer');
             if (defContainer) {
-                defContainer.innerHTML = '<div class="section-title">Definitions</div><p class="error-text" style="color: #888; font-size: 0.9rem;">Definitions unavailable (external dictionary offline or timed out).</p>';
+                defContainer.innerHTML = '<div class="section-title">Definitions</div><p class="error-text" style="color: #888; font-size: 0.9rem;">Definitions unavailable.</p>';
             }
         }
     })();
@@ -1139,31 +1210,34 @@ async function loadCard() {
     fcProgressText.textContent = `Word ${currentCardIndex + 1} of ${reviewQueue.length}`;
 
     // Fetch details
-    // 1. Definition (with 3-second timeout)
+    // 1. Definition from local server endpoint
+    let dictResult = null;
     try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 3000);
-        const res = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(word)}`, {
-            signal: controller.signal
-        });
-        clearTimeout(timeoutId);
-
-        const defs = await res.json();
-        if (Array.isArray(defs) && defs.length > 0 && defs[0].meanings && defs[0].meanings.length > 0) {
-            const firstDef = defs[0].meanings[0].definitions[0].definition;
-            fcDefinition.textContent = firstDef;
+        const res = await fetch(`/api/dictionary/${encodeURIComponent(word)}`);
+        dictResult = await res.json();
+        if (dictResult && dictResult.meanings && dictResult.meanings.length > 0) {
+            const firstMeaning = dictResult.meanings[0];
+            const posPrefix = firstMeaning.pos ? `(${firstMeaning.pos}) ` : '';
+            fcDefinition.textContent = `${posPrefix}${firstMeaning.def}`;
         } else {
             fcDefinition.textContent = 'No definition found.';
         }
     } catch (e) {
-        fcDefinition.textContent = 'Definitions unavailable (external dictionary offline or timed out).';
+        fcDefinition.textContent = 'Definitions unavailable.';
     }
 
-    // 2. Context (Find from local data)
+    // 2. Context (Find from local data or dictionary fallback)
     const data = getAggregatedData();
     const item = data.results.find(i => i.word.toLowerCase() === word.toLowerCase());
     if (item && item.context && item.context.length > 0) {
-        fcContext.innerHTML = `"${escapeHtml(item.context[0])}"`;
+        const ctx = item.context[0];
+        const ctxText = typeof ctx === 'string' ? ctx : (ctx.text || '');
+        const isDict = typeof ctx === 'object' && ctx.source === 'dictionary';
+        fcContext.innerHTML = `"${escapeHtml(ctxText)}"${isDict ? ' <span style="font-size:0.85rem; color:#93c5fd;">(Ví dụ từ điển)</span>' : ''}`;
+    } else if (dictResult && dictResult.examples && dictResult.examples.length > 0) {
+        const ex = dictResult.examples[0];
+        const exText = ex.en || ex.example || '';
+        fcContext.innerHTML = `"${escapeHtml(exText)}" <span style="font-size:0.85rem; color:#93c5fd;">(Ví dụ từ điển)</span>`;
     } else {
         fcContext.textContent = 'Custom added word (no book context excerpt available).';
     }

@@ -13,8 +13,8 @@ router.get('/words', authenticateToken, async (req, res) => {
     }
 });
 
-// Sync (Upsert) words
-// Body: { words: [{ word, srsInterval, nextReview, streak }] }
+// Sync (Upsert) words and phrases
+// Body: { words: [{ word, type, meaning, context, notes, srsInterval, nextReview, streak }] }
 router.post('/words/sync', authenticateToken, async (req, res) => {
     const { words } = req.body;
     if (!Array.isArray(words)) return res.status(400).json({ error: 'Invalid data' });
@@ -23,9 +23,14 @@ router.post('/words/sync', authenticateToken, async (req, res) => {
         const results = await sequelize.transaction(async (t) => {
             const synced = [];
             for (const w of words) {
+                const itemType = w.type || (w.word.includes(' ') ? 'phrase' : 'word');
                 const [record, created] = await SavedWord.findOrCreate({
                     where: { UserId: req.user.id, word: w.word },
                     defaults: {
+                        type: itemType,
+                        meaning: w.meaning || null,
+                        context: w.context || null,
+                        notes: w.notes || null,
                         srsInterval: w.srsInterval || 0,
                         nextReview: w.nextReview || null,
                         streak: w.streak || 0
@@ -35,6 +40,10 @@ router.post('/words/sync', authenticateToken, async (req, res) => {
 
                 if (!created) {
                     // Update if exists
+                    if (w.type !== undefined) record.type = w.type;
+                    if (w.meaning !== undefined) record.meaning = w.meaning;
+                    if (w.context !== undefined) record.context = w.context;
+                    if (w.notes !== undefined) record.notes = w.notes;
                     if (w.srsInterval !== undefined) record.srsInterval = w.srsInterval;
                     if (w.nextReview !== undefined) record.nextReview = w.nextReview;
                     if (w.streak !== undefined) record.streak = w.streak;

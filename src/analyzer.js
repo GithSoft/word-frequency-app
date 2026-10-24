@@ -200,6 +200,7 @@ async function extractContexts(text, targetWords, options = {}) {
   const wordContexts = new Map(); // word -> Array<ContextItem>
   const targetWordsNorm = caseSensitive ? targetWords : targetWords.map(w => w.toLowerCase());
   const targetSet = new Set(targetWordsNorm);
+  const phraseTargets = targetWordsNorm.filter(w => w.includes(' '));
 
   // Build newline index array and page index array (\f form feeds)
   const newlinePositions = [];
@@ -272,6 +273,28 @@ async function extractContexts(text, targetWords, options = {}) {
         // 2. Collect candidates (limit to 50 to avoid memory bloat)
         if (contexts.length < 50) {
           const score = scoreSentence(sentence, word, word, trimmedLower);
+          contexts.push(new ContextItem({
+            text: trimmed,
+            score,
+            source: 'document',
+            fileName: options.fileName || 'document',
+            line,
+            page
+          }));
+        }
+      }
+    }
+
+    // Check multi-word phrase targets
+    for (const phrase of phraseTargets) {
+      if (sentenceLower.includes(phrase)) {
+        if (!wordContexts.has(phrase)) {
+          wordContexts.set(phrase, []);
+        }
+
+        const contexts = wordContexts.get(phrase);
+        if (contexts.length < 50) {
+          const score = scoreSentence(sentence, phrase, phrase, trimmedLower);
           contexts.push(new ContextItem({
             text: trimmed,
             score,

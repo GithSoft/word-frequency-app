@@ -6,6 +6,22 @@ const SavedWord = sequelize.define('SavedWord', {
         type: DataTypes.STRING,
         allowNull: false
     },
+    type: {
+        type: DataTypes.STRING, // 'word' | 'phrase'
+        defaultValue: 'word'
+    },
+    meaning: {
+        type: DataTypes.TEXT,
+        allowNull: true
+    },
+    context: {
+        type: DataTypes.TEXT,
+        allowNull: true
+    },
+    notes: {
+        type: DataTypes.TEXT,
+        allowNull: true
+    },
     srsInterval: {
         type: DataTypes.INTEGER,
         defaultValue: 0 // in minutes

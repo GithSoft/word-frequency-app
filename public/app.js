@@ -8,8 +8,24 @@
 // ==========================================
 let filesData = JSON.parse(localStorage.getItem('wfa_files') || '{}');
 let savedWords = JSON.parse(localStorage.getItem('wfa_saved') || '[]');
+let savedMetadata = JSON.parse(localStorage.getItem('wfa_meta') || '{}');
+let savedSubfilter = 'all'; // 'all' | 'words' | 'phrases'
 let selectedFiles = new Set(); // Multi-select files
 let showSavedOnly = false;
+
+function isPhraseItem(word) {
+    if (!word) return false;
+    const lower = word.toLowerCase();
+    if (savedMetadata[lower]?.type) {
+        return savedMetadata[lower].type === 'phrase';
+    }
+    return word.trim().includes(' ');
+}
+
+function updateHeaderSavedCount() {
+    const el = document.getElementById('headerSavedCount');
+    if (el) el.textContent = savedWords.length.toLocaleString();
+}
 
 // DOM Elements
 const uploadZone = document.getElementById('uploadZone');
@@ -25,6 +41,7 @@ const exportBtn = document.getElementById('exportBtn');
 const tableBody = document.getElementById('tableBody');
 const fileSelector = document.getElementById('fileSelector');
 const savedCountEl = document.getElementById('savedCount');
+const contextModalEl = document.getElementById('contextModal');
 
 function escapeHtml(str) {
     if (!str) return '';
@@ -33,15 +50,46 @@ function escapeHtml(str) {
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#39;');
+        .replace(/'/g, '&#39;')
+        .replace(/`/g, '&#96;');
+}
+
+function escapeRegExp(string) {
+    if (!string) return '';
+    return String(string).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function highlightWordInText(text, word) {
+    if (!text) return '';
+    if (!word) return escapeHtml(text);
+    try {
+        const pattern = escapeRegExp(word);
+        const regex = new RegExp(`(?:\\b|^)${pattern}(?:\\b|$)`, 'gi');
+        let result = '';
+        let lastIdx = 0;
+        let match;
+        while ((match = regex.exec(text)) !== null) {
+            result += escapeHtml(text.slice(lastIdx, match.index));
+            result += `<strong>${escapeHtml(match[0])}</strong>`;
+            lastIdx = regex.lastIndex;
+            if (!regex.global) break;
+        }
+        result += escapeHtml(text.slice(lastIdx));
+        return result || escapeHtml(text);
+    } catch {
+        return escapeHtml(text);
+    }
 }
 
 // ==========================================
 // Initialization
 // ==========================================
 function init() {
-    if (Object.keys(filesData).length > 0) {
-        // Select all files by default
+    updateHeaderSavedCount();
+    const hasFiles = Object.keys(filesData).length > 0;
+    const hasSaved = savedWords.length > 0;
+
+    if (hasFiles) {
         selectedFiles = new Set(Object.keys(filesData));
         showResults();
 
@@ -51,6 +99,9 @@ function init() {
                 fetchContexts(file.fileId, file.fileName);
             }
         });
+    } else if (hasSaved) {
+        showSavedOnly = true;
+        showResults();
     } else {
         resetUpload();
     }
@@ -257,9 +308,14 @@ function showResults() {
     const actionSection = document.querySelector('.action-section');
     const uploadCard = document.querySelector('.upload-card');
 
-    uploadCard.style.display = 'none';
+    if (Object.keys(filesData).length > 0) {
+        uploadCard.style.display = 'none';
+        if (actionSection) actionSection.style.display = 'block';
+    } else {
+        uploadCard.style.display = 'block';
+        if (actionSection) actionSection.style.display = 'none';
+    }
     if (resultsContent) resultsContent.style.display = 'block';
-    if (actionSection) actionSection.style.display = 'block';
 
     updateFileSelector();
     updateStats();
@@ -320,25 +376,37 @@ function updateFileSelector() {
             statusIcon = '<span class="status-icon error" title="Analysis failed">❌</span>';
         }
 
+        const escapedFileName = escapeHtml(fileName);
+        const escapedShortName = escapeHtml(shortName);
+
         html += `
       <div class="file-chip ${checked && !showSavedOnly ? 'active' : ''} ${status}">
-        <label class="file-label" title="${fileName}">
-          <input type="checkbox" value="${fileName}" ${checked && !showSavedOnly ? 'checked' : ''} onchange="toggleFile('${fileName}', this.checked)">
+        <label class="file-label" title="${escapedFileName}">
+          <input type="checkbox" value="${escapedFileName}" data-action="toggle-file" data-file="${escapedFileName}" ${checked && !showSavedOnly ? 'checked' : ''}>
           ${statusIcon}
-          <span>${shortName}</span>
+          <span>${escapedShortName}</span>
         </label>
-        <button class="delete-file-btn" onclick="deleteFile('${fileName}')" title="Remove file">×</button>
+        <button type="button" class="delete-file-btn" data-action="delete-file" data-file="${escapedFileName}" title="Remove file">×</button>
       </div>
     `;
     });
 
     // Saved words option
     if (savedWords.length > 0) {
+        const phrasesCount = savedWords.filter(w => isPhraseItem(w)).length;
+        const wordsCount = savedWords.length - phrasesCount;
         html += `
       <label class="file-checkbox saved-filter ${showSavedOnly ? 'active' : ''}">
         <input type="checkbox" value="saved" ${showSavedOnly ? 'checked' : ''} onchange="toggleSavedOnly(this.checked)">
         <span>⭐ Saved (${savedWords.length})</span>
       </label>
+      ${showSavedOnly ? `
+        <div class="saved-filter-tabs">
+          <button type="button" class="saved-tab-btn ${savedSubfilter === 'all' ? 'active' : ''}" onclick="setSavedSubfilter('all')">Tất cả (${savedWords.length})</button>
+          <button type="button" class="saved-tab-btn ${savedSubfilter === 'words' ? 'active' : ''}" onclick="setSavedSubfilter('words')">Từ (${wordsCount})</button>
+          <button type="button" class="saved-tab-btn ${savedSubfilter === 'phrases' ? 'active' : ''}" onclick="setSavedSubfilter('phrases')">Cụm từ (${phrasesCount})</button>
+        </div>
+      ` : ''}
     `;
     }
 
@@ -349,6 +417,15 @@ function updateFileSelector() {
 
     fileSelector.innerHTML = html;
 }
+
+function setSavedSubfilter(sub) {
+    savedSubfilter = sub;
+    invalidateAggregatedData();
+    tableData = getAggregatedData().results;
+    updateFileSelector();
+    updateTable();
+}
+window.setSavedSubfilter = setSavedSubfilter;
 
 function toggleAllFiles(checked) {
     showSavedOnly = false;
@@ -486,15 +563,23 @@ function getAggregatedData() {
         const existingWords = new Set(results.map(r => r.word.toLowerCase()));
         savedWords.forEach(savedWord => {
             if (!existingWords.has(savedWord.toLowerCase())) {
+                const meta = savedMetadata[savedWord.toLowerCase()];
                 results.push({
                     word: savedWord,
                     count: 0,
                     percentage: '0.00',
-                    context: [],
+                    context: meta?.context ? [meta.context] : [],
                     isCustom: true
                 });
             }
         });
+
+        // Apply Subfilter: all, words, phrases
+        if (savedSubfilter === 'words') {
+            results = results.filter(item => !isPhraseItem(item.word));
+        } else if (savedSubfilter === 'phrases') {
+            results = results.filter(item => isPhraseItem(item.word));
+        }
     }
 
     // Precompute rank (1-indexed based on frequency order, '—' for custom words)
@@ -600,22 +685,42 @@ function renderRow(item, savedSet) {
     const rankDisplay = item.rank !== undefined ? item.rank : '—';
     const pctDisplay = item.percentage !== undefined ? item.percentage : '0.00';
     const escapedWord = escapeHtml(item.word);
+    const isPhrase = isPhraseItem(item.word);
+    const meta = savedMetadata[item.word.toLowerCase()];
+    const badgeHtml = isPhrase
+        ? `<span class="badge badge-phrase" title="Cụm từ / Phrase">Phrase</span>`
+        : (isSaved ? `<span class="badge badge-word" title="Từ đơn">Word</span>` : '');
+    const meaningPreviewHtml = meta?.meaning
+        ? `<div class="phrase-meaning-preview" title="${escapeHtml(meta.meaning)}">${escapeHtml(meta.meaning)}</div>`
+        : '';
 
     return `
-    <tr class="word-row" onclick="showContext('${escapedWord}')">
+    <tr class="word-row" data-word="${escapedWord}">
       <td>${rankDisplay}</td>
       <td class="word-cell">
-        <span class="word-text">${escapedWord}</span>
-        <button class="icon-btn tts-hover-btn" onclick="event.stopPropagation(); speakWord('${escapedWord}')" title="Listen">🔊</button>
+        <div>
+          <span class="word-text">${escapedWord}</span>
+          ${badgeHtml}
+          <button type="button" class="icon-btn tts-hover-btn" data-action="tts" data-word="${escapedWord}" title="Listen">🔊</button>
+          ${meaningPreviewHtml}
+        </div>
       </td>
       <td>${countDisplay}</td>
       <td>${pctDisplay}%</td>
-      <td onclick="event.stopPropagation()">
-        <button class="save-btn ${isSaved ? 'saved' : ''}" 
-                onclick="toggleSave('${escapedWord}')" 
-                title="${isSaved ? 'Remove from saved' : 'Save word'}">
-          ${isSaved ? '⭐' : '☆'}
-        </button>
+      <td>
+        <div style="display:inline-flex; align-items:center; gap:6px;">
+          ${isSaved ? `
+            <button type="button" class="icon-btn" data-action="edit" data-word="${escapedWord}" title="Chỉnh sửa nghĩa / ví dụ" style="font-size:0.9rem; padding:4px;">
+              ✏️
+            </button>
+          ` : ''}
+          <button type="button" class="save-btn ${isSaved ? 'saved' : ''}" 
+                  data-action="save"
+                  data-word="${escapedWord}" 
+                  title="${isSaved ? 'Xóa khỏi sổ từ' : 'Lưu từ/cụm từ'}">
+            ${isSaved ? '⭐' : '☆'}
+          </button>
+        </div>
       </td>
     </tr>
   `;
@@ -702,16 +807,19 @@ function updateTable() {
             tableBody.innerHTML = `
                 <tr>
                     <td colspan="5" style="text-align:center; padding: 35px 20px;">
-                        <div style="max-width: 480px; margin: 0 auto; display: flex; flex-direction: column; align-items: center; gap: 12px;">
+                        <div style="max-width: 500px; margin: 0 auto; display: flex; flex-direction: column; align-items: center; gap: 12px;">
                             <div style="font-size: 1.05rem; color: #a8a8b3;">
-                                No matches found for <strong>'${escapedTerm}'</strong> in this document.
+                                Không tìm thấy <strong>'${escapedTerm}'</strong> trong tài liệu này.
                             </div>
                             <div style="display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;">
                                 <button id="emptySearchSaveBtn" class="primary-btn" style="display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; font-size: 0.9rem; cursor: pointer; ${isSaved ? 'background: linear-gradient(135deg, #10b981 0%, #059669 100%);' : ''}">
-                                    ${isSaved ? '⭐ Saved in Vocabulary' : '⭐ Add to Vocabulary'}
+                                    ${isSaved ? '⭐ Đã lưu' : '⭐ Lưu nhanh'}
+                                </button>
+                                <button id="emptySearchDetailBtn" class="secondary-btn" style="display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; font-size: 0.9rem; cursor: pointer;">
+                                    ✏️ Thêm chi tiết nghĩa & ngữ cảnh
                                 </button>
                                 <button id="emptySearchDictBtn" class="primary-btn" style="display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; font-size: 0.9rem; cursor: pointer; background: #6c757d;">
-                                    📖 View Definitions
+                                    📖 Xem từ điển
                                 </button>
                             </div>
                         </div>
@@ -724,8 +832,15 @@ function updateTable() {
                 saveBtn.addEventListener('click', () => {
                     toggleSave(searchTerm);
                     const currentlySaved = new Set(savedWords.map(w => w.toLowerCase())).has(searchTerm.toLowerCase());
-                    saveBtn.innerHTML = currentlySaved ? '⭐ Saved in Vocabulary' : '⭐ Add to Vocabulary';
+                    saveBtn.innerHTML = currentlySaved ? '⭐ Đã lưu' : '⭐ Lưu nhanh';
                     saveBtn.style.background = currentlySaved ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : '';
+                });
+            }
+
+            const detailBtn = document.getElementById('emptySearchDetailBtn');
+            if (detailBtn) {
+                detailBtn.addEventListener('click', () => {
+                    openAddPhraseModal(searchTerm);
                 });
             }
 
@@ -777,15 +892,22 @@ function updateTable() {
 }
 
 // ==========================================
-// Save Words Feature
+// Save Words & Phrases Feature
 // ==========================================
-function toggleSave(word) {
-    const index = savedWords.indexOf(word);
-    if (index > -1) {
-        savedWords.splice(index, 1);
-    } else {
-        savedWords.push(word);
+function saveWordOrPhrase(word, meta = {}) {
+    const trimmed = (word || '').trim();
+    if (!trimmed) return;
+    const lower = trimmed.toLowerCase();
+    if (!savedWords.includes(trimmed)) {
+        savedWords.push(trimmed);
     }
+    const detectedType = meta.type || (trimmed.includes(' ') ? 'phrase' : 'word');
+    savedMetadata[lower] = {
+        type: detectedType,
+        meaning: meta.meaning !== undefined ? meta.meaning : (savedMetadata[lower]?.meaning || ''),
+        context: meta.context !== undefined ? meta.context : (savedMetadata[lower]?.context || ''),
+        notes: meta.notes !== undefined ? meta.notes : (savedMetadata[lower]?.notes || '')
+    };
     saveSavedWords();
     invalidateAggregatedData();
     if (showSavedOnly) {
@@ -794,6 +916,33 @@ function toggleSave(word) {
     updateFileSelector();
     updateTable();
     updateStats();
+    if (typeof syncOneWord === 'function' && authToken) {
+        syncOneWord(trimmed);
+    }
+}
+window.saveWordOrPhrase = saveWordOrPhrase;
+
+function toggleSave(word) {
+    const index = savedWords.indexOf(word);
+    if (index > -1) {
+        savedWords.splice(index, 1);
+        delete savedMetadata[word.toLowerCase()];
+        delete srsData[word];
+        saveSavedWords();
+        localStorage.setItem('wfa_srs', JSON.stringify(srsData));
+        invalidateAggregatedData();
+        if (showSavedOnly) {
+            tableData = getAggregatedData().results;
+        }
+        updateFileSelector();
+        updateTable();
+        updateStats();
+        if (typeof syncOneWord === 'function' && authToken) {
+            syncOneWord(word);
+        }
+    } else {
+        saveWordOrPhrase(word);
+    }
 }
 
 window.toggleSave = toggleSave;
@@ -816,8 +965,7 @@ function renderContextItem(c, word) {
     const page = isString ? 1 : (c.page || 1);
     const translation = isString ? '' : (c.translation || '');
 
-    const regex = new RegExp(`\\b${escapeHtml(word)}\\b`, 'gi');
-    const highlighted = escapeHtml(text).replace(regex, match => `<strong>${match}</strong>`);
+    const highlighted = highlightWordInText(text, word);
 
     if (source === 'dictionary') {
         return `<div class="context-item context-dict">
@@ -909,9 +1057,13 @@ async function showContext(word) {
     // Setup Header with Word and Actions
     wordSpan.innerHTML = `
         ${escapedWord}
-        <button class="icon-btn" onclick="speakWord('${escapedWord}')" title="Listen" style="font-size: 1rem; margin-left: 8px;">🔊</button>
-        <a href="https://translate.google.com/?sl=auto&tl=vi&text=${encodeURIComponent(word)}" target="_blank" class="icon-btn" title="Translate (Google)" style="font-size: 1rem; text-decoration: none;">🌐</a>
+        <button type="button" class="icon-btn" id="contextHeaderSpeakBtn" title="Listen" style="font-size: 1rem; margin-left: 8px;">🔊</button>
+        <a href="https://translate.google.com/?sl=auto&tl=vi&text=${encodeURIComponent(word)}" target="_blank" rel="noopener noreferrer" class="icon-btn" title="Translate (Google)" style="font-size: 1rem; text-decoration: none;">🌐</a>
     `;
+    const contextHeaderSpeakBtn = document.getElementById('contextHeaderSpeakBtn');
+    if (contextHeaderSpeakBtn) {
+        contextHeaderSpeakBtn.addEventListener('click', () => speakWord(word));
+    }
 
     // Check if any selected file is still processing
     const processingFiles = Object.values(filesData).filter(f => selectedFiles.has(f.fileName) && f.status === 'processing');
@@ -989,7 +1141,7 @@ async function showContext(word) {
                 defHtml += `
                     <div class="phonetic-container" style="margin-bottom: 8px;">
                         <span style="color:#a78bfa; font-weight:500;">/${escapeHtml(dict.phonetic.replace(/^\/+|\/+$/g, ''))}/</span>
-                        <button class="icon-btn" onclick="speakWord('${escapeHtml(dict.lemma || word)}')" title="Listen" style="font-size: 0.9rem; padding: 2px 4px; margin-left:4px;">🔊</button>
+                        <button type="button" class="icon-btn" data-action="dict-speak" data-word="${escapeHtml(dict.lemma || word)}" title="Listen" style="font-size: 0.9rem; padding: 2px 4px; margin-left:4px;">🔊</button>
                     </div>`;
             }
 
@@ -1066,16 +1218,70 @@ if (typeof module !== 'undefined' && module.exports) {
     };
 }
 
-// Modal close handlers
-document.getElementById('closeModalBtn').addEventListener('click', () => {
-    document.getElementById('contextModal').style.display = 'none';
-});
-
-document.getElementById('contextModal').addEventListener('click', (e) => {
-    if (e.target.id === 'contextModal') {
-        document.getElementById('contextModal').style.display = 'none';
+// Modal close handlers & delegation
+if (contextModalEl) {
+    const closeModalBtn = document.getElementById('closeModalBtn');
+    if (closeModalBtn) {
+        closeModalBtn.addEventListener('click', () => {
+            contextModalEl.style.display = 'none';
+        });
     }
-});
+
+    contextModalEl.addEventListener('click', (e) => {
+        if (e.target.id === 'contextModal') {
+            contextModalEl.style.display = 'none';
+            return;
+        }
+        const speakBtn = e.target.closest('[data-action="dict-speak"]');
+        if (speakBtn && speakBtn.dataset.word) {
+            e.stopPropagation();
+            speakWord(speakBtn.dataset.word);
+        }
+    });
+}
+
+// Table row & action delegation
+if (tableBody) {
+    tableBody.addEventListener('click', (e) => {
+        const actionBtn = e.target.closest('[data-action]');
+        if (actionBtn) {
+            e.stopPropagation();
+            const action = actionBtn.dataset.action;
+            const word = actionBtn.dataset.word;
+            if (!word) return;
+            if (action === 'tts') {
+                speakWord(word);
+            } else if (action === 'edit') {
+                openEditPhraseModal(word);
+            } else if (action === 'save') {
+                toggleSave(word);
+            }
+            return;
+        }
+
+        const row = e.target.closest('tr.word-row');
+        if (row && row.dataset.word) {
+            showContext(row.dataset.word);
+        }
+    });
+}
+
+// File selector delegation
+if (fileSelector) {
+    fileSelector.addEventListener('change', (e) => {
+        if (e.target.dataset.action === 'toggle-file') {
+            const fileName = e.target.dataset.file;
+            toggleFile(fileName, e.target.checked);
+        }
+    });
+    fileSelector.addEventListener('click', (e) => {
+        const delBtn = e.target.closest('[data-action="delete-file"]');
+        if (delBtn && delBtn.dataset.file) {
+            e.stopPropagation();
+            deleteFile(delBtn.dataset.file);
+        }
+    });
+}
 
 // ==========================================
 // File Source Selection (for compatibility)
@@ -1191,9 +1397,15 @@ function saveFilesData() {
     localStorage.setItem('wfa_files', JSON.stringify(filesData));
 }
 
+function saveSavedMetadata() {
+    localStorage.setItem('wfa_meta', JSON.stringify(savedMetadata));
+}
+
 function saveSavedWords() {
     invalidateAggregatedData();
     localStorage.setItem('wfa_saved', JSON.stringify(savedWords));
+    saveSavedMetadata();
+    updateHeaderSavedCount();
 }
 
 // Initialize app when DOM is fully loaded to prevent browser "loading" hang
@@ -1277,10 +1489,27 @@ async function loadCard() {
     isFlipped = false;
     flashcard.classList.remove('flipped');
 
+    const isPhrase = isPhraseItem(word);
+    const meta = savedMetadata[word.toLowerCase()] || {};
+
+    const fcTypeBadge = document.getElementById('fcTypeBadge');
+    if (fcTypeBadge) {
+        fcTypeBadge.className = 'fc-type-badge ' + (isPhrase ? 'phrase' : 'word');
+        fcTypeBadge.textContent = isPhrase ? 'Cụm từ / Phrase' : 'Từ đơn / Word';
+    }
+
+    const fcSpeakBtn = document.getElementById('fcSpeakBtn');
+    if (fcSpeakBtn) {
+        fcSpeakBtn.onclick = (e) => {
+            e.stopPropagation();
+            speakWord(word);
+        };
+    }
+
     fcWord.textContent = word;
     fcDefinition.innerHTML = 'Loading definition...';
     fcContext.textContent = 'Loading context...';
-    fcProgressText.textContent = `Word ${currentCardIndex + 1} of ${reviewQueue.length}`;
+    fcProgressText.textContent = `${isPhrase ? 'Phrase' : 'Word'} ${currentCardIndex + 1} of ${reviewQueue.length}`;
 
     // Fetch details
     // 1. Definition from local server endpoint
@@ -1288,33 +1517,56 @@ async function loadCard() {
     try {
         const res = await fetch(`/api/dictionary/${encodeURIComponent(word)}`);
         dictResult = await res.json();
-        if (dictResult && dictResult.meanings && dictResult.meanings.length > 0) {
-            const firstMeaning = dictResult.meanings[0];
-            let posText = (firstMeaning.pos || '').trim();
-            if (posText.toLowerCase() === 'general') posText = '';
-            const posPrefix = posText ? `(${posText}) ` : '';
-            fcDefinition.textContent = `${posPrefix}${firstMeaning.def}`;
-        } else {
-            fcDefinition.textContent = 'No definition found.';
-        }
     } catch (e) {
-        fcDefinition.textContent = 'Definitions unavailable.';
+        // ignore
     }
 
-    // 2. Context (Find from local data or dictionary fallback)
-    const data = getAggregatedData();
-    const item = data.results.find(i => i.word.toLowerCase() === word.toLowerCase());
-    if (item && item.context && item.context.length > 0) {
-        const ctx = item.context[0];
-        const ctxText = typeof ctx === 'string' ? ctx : (ctx.text || '');
-        const isDict = typeof ctx === 'object' && ctx.source === 'dictionary';
-        fcContext.innerHTML = `"${escapeHtml(ctxText)}"${isDict ? ' <span style="font-size:0.85rem; color:#93c5fd;">(Ví dụ từ điển)</span>' : ''}`;
-    } else if (dictResult && dictResult.examples && dictResult.examples.length > 0) {
-        const ex = dictResult.examples[0];
-        const exText = ex.en || ex.example || '';
-        fcContext.innerHTML = `"${escapeHtml(exText)}" <span style="font-size:0.85rem; color:#93c5fd;">(Ví dụ từ điển)</span>`;
+    // Build definition HTML
+    let defHtml = '';
+    if (meta.meaning) {
+        defHtml += `
+            <div class="fc-custom-meaning">
+                <div class="fc-custom-meaning-title">Nghĩa của bạn:</div>
+                <div class="fc-custom-meaning-text">${escapeHtml(meta.meaning)}</div>
+            </div>
+        `;
+    }
+
+    if (dictResult && dictResult.meanings && dictResult.meanings.length > 0) {
+        const firstMeaning = dictResult.meanings[0];
+        let posText = (firstMeaning.pos || '').trim();
+        if (posText.toLowerCase() === 'general') posText = '';
+        const posPrefix = posText ? `(${posText}) ` : '';
+        const dictDefText = `${posPrefix}${firstMeaning.def}`;
+        if (meta.meaning) {
+            defHtml += `<div style="font-size:0.85rem; color:#a8a8b3; margin-top:6px; text-align:left;">Từ điển: ${escapeHtml(dictDefText)}</div>`;
+        } else {
+            defHtml = dictDefText;
+        }
+    } else if (!meta.meaning) {
+        defHtml = 'No definition found.';
+    }
+
+    fcDefinition.innerHTML = defHtml;
+
+    // 2. Context (Find from saved custom context or local document data or dictionary fallback)
+    if (meta.context) {
+        fcContext.innerHTML = `"${escapeHtml(meta.context)}" <span style="font-size:0.85rem; color:#f472b6;">(Ví dụ đã lưu)</span>`;
     } else {
-        fcContext.textContent = 'Custom added word (no book context excerpt available).';
+        const data = getAggregatedData();
+        const item = data.results.find(i => i.word.toLowerCase() === word.toLowerCase());
+        if (item && item.context && item.context.length > 0) {
+            const ctx = item.context[0];
+            const ctxText = typeof ctx === 'string' ? ctx : (ctx.text || '');
+            const isDict = typeof ctx === 'object' && ctx.source === 'dictionary';
+            fcContext.innerHTML = `"${escapeHtml(ctxText)}"${isDict ? ' <span style="font-size:0.85rem; color:#93c5fd;">(Ví dụ từ điển)</span>' : ''}`;
+        } else if (dictResult && dictResult.examples && dictResult.examples.length > 0) {
+            const ex = dictResult.examples[0];
+            const exText = ex.en || ex.example || '';
+            fcContext.innerHTML = `"${escapeHtml(exText)}" <span style="font-size:0.85rem; color:#93c5fd;">(Ví dụ từ điển)</span>`;
+        } else {
+            fcContext.textContent = isPhrase ? 'Custom added phrase (no book context excerpt available).' : 'Custom added word (no book context excerpt available).';
+        }
     }
 }
 
@@ -1555,8 +1807,13 @@ async function syncData() {
 
         // Add local
         savedWords.forEach(w => {
+            const meta = savedMetadata[w.toLowerCase()] || {};
             mergedWords.set(w, {
                 word: w,
+                type: meta.type || (w.includes(' ') ? 'phrase' : 'word'),
+                meaning: meta.meaning || null,
+                context: meta.context || null,
+                notes: meta.notes || null,
                 srsInterval: srsData[w]?.interval || 0,
                 nextReview: srsData[w]?.nextReview || null,
                 streak: srsData[w]?.streak || 0
@@ -1566,14 +1823,22 @@ async function syncData() {
         // Merge remote
         remoteWords.forEach(rw => {
             const existing = mergedWords.get(rw.word);
-            // Remote wins for SRS data if newer? 
-            // For simplicity, just overwrite local if remote exists
             mergedWords.set(rw.word, {
                 word: rw.word,
+                type: rw.type || (rw.word.includes(' ') ? 'phrase' : 'word'),
+                meaning: rw.meaning || existing?.meaning || null,
+                context: rw.context || existing?.context || null,
+                notes: rw.notes || existing?.notes || null,
                 srsInterval: rw.srsInterval,
                 nextReview: rw.nextReview,
                 streak: rw.streak
             });
+            savedMetadata[rw.word.toLowerCase()] = {
+                type: rw.type || (rw.word.includes(' ') ? 'phrase' : 'word'),
+                meaning: rw.meaning || '',
+                context: rw.context || '',
+                notes: rw.notes || ''
+            };
         });
 
         // Update Local State
@@ -1592,8 +1857,13 @@ async function syncData() {
         saveSavedWords();
         localStorage.setItem('wfa_srs', JSON.stringify(srsData));
 
-        updateStats();
-        renderTable();
+        if (Object.keys(filesData).length === 0 && savedWords.length > 0) {
+            showSavedOnly = true;
+            showResults();
+        } else {
+            updateStats();
+            renderTable();
+        }
 
         // 3. Push merged back to server
         const payload = Array.from(mergedWords.values());
@@ -1618,10 +1888,6 @@ const originalToggleSave = window.toggleSave;
 window.toggleSave = function (word) {
     originalToggleSave(word); // updates local
     if (authToken) {
-        // Debounce or just fire? Fire for now.
-        // We only need to sync this specific word or all.
-        // Let's just trigger full sync for simplicity or optimizing later.
-        // Optimization: just sync this word
         syncOneWord(word);
     }
 };
@@ -1630,13 +1896,14 @@ async function syncOneWord(word) {
     const isSaved = savedWords.includes(word);
     if (!isSaved) {
         // Delete
-        await fetch(`/api/user/words/${word}`, {
+        await fetch(`/api/user/words/${encodeURIComponent(word)}`, {
             method: 'DELETE',
             headers: { 'Authorization': `Bearer ${authToken}` }
         });
     } else {
         // Upsert
         const data = srsData[word] || {};
+        const meta = savedMetadata[word.toLowerCase()] || {};
         await fetch('/api/user/words/sync', {
             method: 'POST',
             headers: {
@@ -1646,6 +1913,10 @@ async function syncOneWord(word) {
             body: JSON.stringify({
                 words: [{
                     word,
+                    type: meta.type || (word.includes(' ') ? 'phrase' : 'word'),
+                    meaning: meta.meaning || null,
+                    context: meta.context || null,
+                    notes: meta.notes || null,
                     srsInterval: data.interval || 0,
                     nextReview: data.nextReview ? new Date(data.nextReview) : null,
                     streak: data.streak || 0
@@ -1737,5 +2008,194 @@ if (closeFeedbackBtn) {
         } finally {
             submitFeedbackBtn.textContent = 'Submit';
         }
+    });
+}
+
+// ==========================================
+// Phrase & Advanced Vocabulary Management
+// ==========================================
+const phraseModal = document.getElementById('phraseModal');
+const phraseModalTitle = document.getElementById('phraseModalTitle');
+const closePhraseModalBtn = document.getElementById('closePhraseModalBtn');
+const cancelPhraseBtn = document.getElementById('cancelPhraseBtn');
+const savePhraseSubmitBtn = document.getElementById('savePhraseSubmitBtn');
+const phraseInput = document.getElementById('phraseInput');
+const phraseMeaning = document.getElementById('phraseMeaning');
+const phraseContext = document.getElementById('phraseContext');
+const phraseNotes = document.getElementById('phraseNotes');
+const phraseTypeBadge = document.getElementById('phraseTypeBadge');
+const lookupPhraseBtn = document.getElementById('lookupPhraseBtn');
+const quickAddBtn = document.getElementById('quickAddBtn');
+const quickReviewBtn = document.getElementById('quickReviewBtn');
+const tableAddPhraseBtn = document.getElementById('tableAddPhraseBtn');
+
+if (quickAddBtn) quickAddBtn.addEventListener('click', () => openAddPhraseModal());
+if (tableAddPhraseBtn) tableAddPhraseBtn.addEventListener('click', () => openAddPhraseModal());
+if (quickReviewBtn) quickReviewBtn.addEventListener('click', openFlashcards);
+
+function updatePhraseModalTypeBadge() {
+    if (!phraseInput || !phraseTypeBadge) return;
+    const val = phraseInput.value.trim();
+    const isPhrase = val.includes(' ');
+    phraseTypeBadge.className = 'badge ' + (isPhrase ? 'badge-phrase' : 'badge-word');
+    phraseTypeBadge.textContent = isPhrase ? 'Cụm từ (Phrase)' : 'Từ đơn (Word)';
+}
+
+if (phraseInput) {
+    phraseInput.addEventListener('input', updatePhraseModalTypeBadge);
+}
+
+async function autoLookupPhrase(text) {
+    if (!text || !lookupPhraseBtn) return;
+    try {
+        lookupPhraseBtn.textContent = '⏳ Đang tra...';
+        lookupPhraseBtn.disabled = true;
+        const res = await fetch(`/api/dictionary/${encodeURIComponent(text)}`);
+        const data = await res.json();
+        if (data && data.meanings && data.meanings.length > 0) {
+            const defs = data.meanings.map(m => {
+                const pos = m.pos && m.pos.toLowerCase() !== 'general' ? `(${m.pos}) ` : '';
+                return `${pos}${m.def}`;
+            }).slice(0, 3).join('; ');
+            if (phraseMeaning && !phraseMeaning.value) {
+                phraseMeaning.value = defs;
+            }
+        }
+        if (data && data.examples && data.examples.length > 0 && phraseContext && !phraseContext.value) {
+            const ex = data.examples[0];
+            phraseContext.value = ex.en || ex.example || '';
+        }
+    } catch (e) {
+        console.warn('Auto lookup failed', e);
+    } finally {
+        if (lookupPhraseBtn) {
+            lookupPhraseBtn.textContent = '🔍 Tra nghĩa';
+            lookupPhraseBtn.disabled = false;
+        }
+    }
+}
+
+if (lookupPhraseBtn) {
+    lookupPhraseBtn.addEventListener('click', () => {
+        if (phraseInput) autoLookupPhrase(phraseInput.value.trim());
+    });
+}
+
+function openAddPhraseModal(initialText = '', initialContext = '') {
+    if (!phraseModal) return;
+    phraseModalTitle.textContent = 'Thêm Từ hoặc Cụm từ mới';
+    phraseInput.value = initialText;
+    phraseInput.disabled = false;
+    phraseMeaning.value = '';
+    phraseContext.value = initialContext;
+    phraseNotes.value = '';
+    updatePhraseModalTypeBadge();
+    phraseModal.style.display = 'flex';
+    phraseInput.focus();
+
+    if (initialText) {
+        autoLookupPhrase(initialText);
+    }
+}
+
+function openEditPhraseModal(word) {
+    if (!phraseModal) return;
+    phraseModalTitle.textContent = `Chỉnh sửa: ${word}`;
+    phraseInput.value = word;
+    phraseInput.disabled = true;
+    const meta = savedMetadata[word.toLowerCase()] || {};
+    phraseMeaning.value = meta.meaning || '';
+    phraseContext.value = meta.context || '';
+    phraseNotes.value = meta.notes || '';
+    updatePhraseModalTypeBadge();
+    phraseModal.style.display = 'flex';
+    phraseMeaning.focus();
+}
+
+function closePhraseModal() {
+    if (phraseModal) phraseModal.style.display = 'none';
+}
+
+if (closePhraseModalBtn) closePhraseModalBtn.addEventListener('click', closePhraseModal);
+if (cancelPhraseBtn) cancelPhraseBtn.addEventListener('click', closePhraseModal);
+
+if (savePhraseSubmitBtn) {
+    savePhraseSubmitBtn.addEventListener('click', () => {
+        const wordText = phraseInput.value.trim();
+        if (!wordText) {
+            showError('Vui lòng nhập từ hoặc cụm từ');
+            return;
+        }
+        const detectedType = wordText.includes(' ') ? 'phrase' : 'word';
+        saveWordOrPhrase(wordText, {
+            type: detectedType,
+            meaning: phraseMeaning.value.trim(),
+            context: phraseContext.value.trim(),
+            notes: phraseNotes.value.trim()
+        });
+        closePhraseModal();
+        showSuccess(`Đã lưu "${wordText}" vào sổ từ!`);
+    });
+}
+
+window.openAddPhraseModal = openAddPhraseModal;
+window.openEditPhraseModal = openEditPhraseModal;
+
+// Floating selection handler for Context Modal
+const floatingSavePhraseBtn = document.getElementById('floatingSavePhraseBtn');
+const floatingPhraseText = document.getElementById('floatingPhraseText');
+
+if (contextModalEl && floatingSavePhraseBtn) {
+    document.addEventListener('selectionchange', () => {
+        if (contextModalEl.style.display !== 'flex') {
+            floatingSavePhraseBtn.style.display = 'none';
+            return;
+        }
+        const selection = window.getSelection();
+        if (!selection || selection.isCollapsed) {
+            floatingSavePhraseBtn.style.display = 'none';
+            return;
+        }
+        const selectedText = selection.toString().trim();
+        if (selectedText.length < 2 || selectedText.length > 80) {
+            floatingSavePhraseBtn.style.display = 'none';
+            return;
+        }
+
+        try {
+            const range = selection.getRangeAt(0);
+            if (!contextModalEl.contains(range.commonAncestorContainer)) {
+                floatingSavePhraseBtn.style.display = 'none';
+                return;
+            }
+
+            const rect = range.getBoundingClientRect();
+            if (rect.width === 0 && rect.height === 0) {
+                floatingSavePhraseBtn.style.display = 'none';
+                return;
+            }
+
+            floatingPhraseText.textContent = selectedText.length > 25 ? selectedText.slice(0, 25) + '...' : selectedText;
+            floatingSavePhraseBtn.style.display = 'block';
+            floatingSavePhraseBtn.style.top = `${window.scrollY + rect.top - 8}px`;
+            floatingSavePhraseBtn.style.left = `${Math.max(10, window.scrollX + rect.left + (rect.width / 2) - 80)}px`;
+            floatingSavePhraseBtn.dataset.phrase = selectedText;
+
+            let container = range.commonAncestorContainer;
+            while (container && container !== contextModalEl && !(container.classList && container.classList.contains('context-item'))) {
+                container = container.parentNode;
+            }
+            floatingSavePhraseBtn.dataset.context = container ? (container.querySelector('.context-text')?.textContent || '') : '';
+        } catch {
+            floatingSavePhraseBtn.style.display = 'none';
+        }
+    });
+
+    floatingSavePhraseBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const phrase = floatingSavePhraseBtn.dataset.phrase || '';
+        const sentenceContext = floatingSavePhraseBtn.dataset.context || '';
+        floatingSavePhraseBtn.style.display = 'none';
+        openAddPhraseModal(phrase, sentenceContext);
     });
 }

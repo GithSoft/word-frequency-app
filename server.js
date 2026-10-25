@@ -7,10 +7,10 @@ const { parseFile } = require('./src/parsers');
 const { analyzeWordFrequency, extractContexts } = require('./src/analyzer');
 const dictionaryService = require('./src/dictionary-service');
 
-const { registerPort } = require('./lib/port-manager');
+let portctl; try { portctl = require('portctl'); } catch {}
+const PORT = process.env.PORT || portctl?.get('word-frequency-analyzer') || 4001;
 
 const app = express();
-let PORT = process.env.PORT || 3000;
 
 // Configure multer for file uploads
 const storage = multer.diskStorage({
@@ -438,18 +438,11 @@ app.post('/api/analysis/process-batch', async (req, res) => {
 });
 
 // Start server
-async function start() {
-    try {
-        if (!process.env.PORT) {
-            PORT = await registerPort();
-        }
-    } catch (e) {
-        console.error('[PortManager] Failed to register port, using default:', PORT);
-    }
+function start() {
     app.listen(PORT, () => {
         console.log(`🚀 Server running at http://localhost:${PORT}`);
         console.log(`📊 Upload files to analyze word frequency`);
     });
 }
 
-start().catch(console.error);
+start();

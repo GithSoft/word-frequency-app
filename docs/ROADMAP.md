@@ -5,6 +5,15 @@
 **Target Audience:** Language Learners (B1 ➔ C1/C2), Exam Preppers (IELTS, TOEFL, GRE), Readers of Foreign E-Books & Technical Documentation (PMP, Medical, Tech).  
 **Last Updated:** October 2026  
 
+### 📜 Lineage & Renaming Provenance
+- **Original Project Name:** `word-frequency-analyzer`
+- **Original Repository:** `https://github.com/tackelua/word-frequency-app`
+- **Current Repository:** `https://github.com/GithSoft/wordradar`
+- **Original Primary Domain:** `words.githsoft.com` (permanently retained as active alias)
+- **Current Primary Domain:** `wordradar.githsoft.com`
+- **PM2 Service Transition:** `word-frequency-analyzer` ➔ `wordradar` (Port `4001`)
+- **Renaming Date:** October 26, 2026  
+
 ---
 
 ## 1. 🌟 Product Vision & Market Positioning

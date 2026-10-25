@@ -2,7 +2,9 @@
 
 **Target Domain:** `wordradar.pages.dev`  
 **Planned Branch:** `feature/wordradar-cloudflare`  
-**Goal:** Migrate Word Frequency Analyzer into an independent, non-commercial, 100% serverless/client-side static PWA on Cloudflare Pages without consuming backend resources.
+**Original Name:** `word-frequency-analyzer` (`tackelua/word-frequency-app`)  
+**Current Repo:** `https://github.com/GithSoft/wordradar`  
+**Goal:** Migrate WordRadar into an independent, non-commercial, 100% serverless/client-side static PWA on Cloudflare Pages without consuming backend resources.
 
 ---
 

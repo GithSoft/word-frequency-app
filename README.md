@@ -2,6 +2,9 @@
 
 A smart lexical profiler and pre-reading companion to help language learners scan books, assess CEFR difficulty, extract high-yield vocabulary, and achieve 95% reading comprehension.
 
+> [!NOTE]
+> **Project Lineage:** Formerly known as `word-frequency-analyzer` (original repository: `tackelua/word-frequency-app`, primary domain: `words.githsoft.com`). Renamed to **WordRadar** on October 26, 2026 under the `GithSoft` organization. `words.githsoft.com` remains active as a permanent alias.
+
 ## 🚀 Features & Roadmap
 
 ### Core Analysis & Visualization

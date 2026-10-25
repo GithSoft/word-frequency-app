@@ -45,11 +45,16 @@ router.post('/login', async (req, res) => {
             console.log(`📧 Email sent to ${email}`);
             res.json({ message: 'OTP sent to email' });
         } else {
-            // Dev Mode
-            console.log(`==========================================`);
-            console.log(`🔑 OTP for ${email}: ${otp}`);
-            console.log(`==========================================`);
-            res.json({ message: 'OTP sent to email (Dev Mode)', devMode: otp });
+            // Local development mode fallback (only when explicitly non-production)
+            if (process.env.NODE_ENV !== 'production') {
+                console.log(`==========================================`);
+                console.log(`🔑 OTP for ${email}: ${otp}`);
+                console.log(`==========================================`);
+                res.json({ message: 'OTP sent to email (Dev Mode)', devMode: otp });
+            } else {
+                console.warn(`[Auth] SMTP credentials missing in production for ${email}`);
+                res.status(503).json({ error: 'Dịch vụ gửi mã qua email hiện chưa được cấu hình trên máy chủ.' });
+            }
         }
     } catch (error) {
         console.error(error);

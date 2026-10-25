@@ -29,7 +29,7 @@ const storage = multer.diskStorage({
 
 const upload = multer({
     storage,
-    limits: { fileSize: Infinity }, // No file size limit
+    limits: { fileSize: 50 * 1024 * 1024 }, // 50MB max limit to protect against OOM
     fileFilter: (req, file, cb) => {
         const allowedTypes = [
             'application/pdf',
@@ -435,6 +435,18 @@ app.post('/api/analysis/process-batch', async (req, res) => {
     }
 
     res.json({ success: true, queued: addedCount });
+});
+
+// Global error handling middleware (handles Multer LIMIT_FILE_SIZE and type errors)
+app.use((err, req, res, next) => {
+    if (err.code === 'LIMIT_FILE_SIZE') {
+        return res.status(413).json({ error: 'Tệp tải lên vượt quá giới hạn tối đa (50MB).' });
+    }
+    if (err.message && err.message.includes('Unsupported file type')) {
+        return res.status(400).json({ error: err.message });
+    }
+    console.error('[Unhandled Error]:', err);
+    res.status(500).json({ error: err.message || 'Internal server error' });
 });
 
 // Start server

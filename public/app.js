@@ -504,6 +504,43 @@ function updateStats() {
     document.getElementById('totalWords').textContent = data.totalWords.toLocaleString();
     document.getElementById('uniqueWords').textContent = data.uniqueWords.toLocaleString();
     savedCountEl.textContent = savedWords.length.toLocaleString();
+
+    // Update CEFR Difficulty & Lexical Profile Radar
+    const cefrStats = data.cefrStats;
+    if (cefrStats) {
+        const overallEl = document.getElementById('overallCefrLevel');
+        if (overallEl) overallEl.textContent = cefrStats.overallLevel ? cefrStats.overallLevel.split(' ')[0] : '—';
+
+        const radarCard = document.getElementById('cefrRadarCard');
+        if (radarCard && data.totalWords > 0) {
+            radarCard.style.display = 'block';
+            const badgeEl = document.getElementById('cefrSummaryBadge');
+            if (badgeEl) badgeEl.textContent = cefrStats.overallLevel;
+
+            const p = cefrStats.percentages || {};
+            const setWidth = (id, val) => {
+                const el = document.getElementById(id);
+                if (el) el.style.width = `${val || 0}%`;
+            };
+            setWidth('barA1', p.A1);
+            setWidth('barA2', p.A2);
+            setWidth('barB1', p.B1);
+            setWidth('barB2', p.B2);
+            setWidth('barC1', p.C1);
+            setWidth('barC2', p.C2);
+
+            const setText = (id, val) => {
+                const el = document.getElementById(id);
+                if (el) el.textContent = `${val || 0}%`;
+            };
+            setText('pctA1', p.A1);
+            setText('pctA2', p.A2);
+            setText('pctB1', p.B1);
+            setText('pctB2', p.B2);
+            setText('pctC1', p.C1);
+            setText('pctC2', p.C2);
+        }
+    }
 }
 
 let cachedAggregatedData = null;
@@ -517,7 +554,7 @@ function getAggregatedData() {
         return cachedAggregatedData;
     }
 
-    const wordMap = new Map(); // word -> { count, context[] }
+    const wordMap = new Map(); // word -> { count, cefr, context[] }
     let totalWords = 0;
 
     // Aggregate selected files only
@@ -528,6 +565,7 @@ function getAggregatedData() {
             const existing = wordMap.get(item.word);
             if (existing) {
                 existing.count += item.count;
+                if (!existing.cefr && item.cefr) existing.cefr = item.cefr;
                 // Merge contexts (up to 5 total)
                 if (item.context && item.context.length > 0) {
                     const spaceLeft = 5 - existing.context.length;
@@ -538,6 +576,7 @@ function getAggregatedData() {
             } else {
                 wordMap.set(item.word, {
                     count: item.count,
+                    cefr: item.cefr || null,
                     context: item.context ? [...item.context] : []
                 });
             }
@@ -549,10 +588,45 @@ function getAggregatedData() {
         .map(([word, data]) => ({
             word,
             count: data.count,
+            cefr: data.cefr || null,
             context: data.context,
             percentage: totalWords > 0 ? ((data.count / totalWords) * 100).toFixed(2) : '0.00'
         }))
         .sort((a, b) => b.count - a.count);
+
+    // Compute CEFR statistics for aggregated results
+    const cefrCounts = { A1: 0, A2: 0, B1: 0, B2: 0, C1: 0, C2: 0 };
+    let totalCategorized = 0;
+    results.forEach(item => {
+        const lvl = (item.cefr || 'C2').toUpperCase();
+        if (cefrCounts[lvl] !== undefined) {
+            cefrCounts[lvl] += item.count;
+        } else {
+            cefrCounts.C2 += item.count;
+        }
+        totalCategorized += item.count;
+    });
+
+    const cefrPercentages = {};
+    for (const [lvl, count] of Object.entries(cefrCounts)) {
+        cefrPercentages[lvl] = totalCategorized > 0
+            ? ((count / totalCategorized) * 100).toFixed(1)
+            : '0.0';
+    }
+
+    let overallLevel = 'B1 Intermediate';
+    const b2Plus = (cefrCounts.B2 + cefrCounts.C1 + cefrCounts.C2) / (totalCategorized || 1);
+    const c1Plus = (cefrCounts.C1 + cefrCounts.C2) / (totalCategorized || 1);
+    if (c1Plus > 0.15) overallLevel = 'C1 Advanced';
+    else if (b2Plus > 0.35) overallLevel = 'B2 Upper-Int';
+    else if (b2Plus > 0.15) overallLevel = 'B1 Intermediate';
+    else overallLevel = 'A2 Elementary';
+
+    const cefrStats = {
+        counts: cefrCounts,
+        percentages: cefrPercentages,
+        overallLevel
+    };
 
     // Filter for saved words only
     if (showSavedOnly) {
@@ -590,7 +664,8 @@ function getAggregatedData() {
     cachedAggregatedData = {
         results,
         totalWords,
-        uniqueWords: wordMap.size
+        uniqueWords: wordMap.size,
+        cefrStats
     };
 
     return cachedAggregatedData;
@@ -663,7 +738,11 @@ function renderWordCloud() {
             .text(d => d.text)
             .on('click', function (event, d) {
                 toggleSave(d.text);
-                renderWordCloud();
+                const isSaved = new Set(savedWords).has(d.text);
+                d3.select(this)
+                    .style('text-shadow', isSaved ? '0 0 8px #10b981' : 'none')
+                    .style('stroke', isSaved ? '#10b981' : 'none')
+                    .style('stroke-width', isSaved ? '0.5px' : '0');
             });
     }
 }
@@ -693,22 +772,26 @@ function renderRow(item, savedSet) {
     const meaningPreviewHtml = meta?.meaning
         ? `<div class="phrase-meaning-preview" title="${escapeHtml(meta.meaning)}">${escapeHtml(meta.meaning)}</div>`
         : '';
+    const cefrBadge = item.cefr
+        ? `<span class="badge badge-cefr badge-${item.cefr.toLowerCase()}">${item.cefr}</span>`
+        : `<span class="badge-cefr-empty">—</span>`;
 
     return `
     <tr class="word-row" data-word="${escapedWord}">
-      <td>${rankDisplay}</td>
-      <td class="word-cell">
+      <td data-label="#">${rankDisplay}</td>
+      <td class="word-cell" data-label="Word">
         <div>
           <span class="word-text">${escapedWord}</span>
           ${badgeHtml}
-          <button type="button" class="icon-btn tts-hover-btn" data-action="tts" data-word="${escapedWord}" title="Listen">🔊</button>
           ${meaningPreviewHtml}
         </div>
       </td>
-      <td>${countDisplay}</td>
-      <td>${pctDisplay}%</td>
-      <td>
+      <td data-label="CEFR">${cefrBadge}</td>
+      <td data-label="Count">${countDisplay}</td>
+      <td data-label="%">${pctDisplay}%</td>
+      <td class="col-actions" data-label="Actions">
         <div style="display:inline-flex; align-items:center; gap:6px;">
+          <button type="button" class="icon-btn tts-btn" data-action="tts" data-word="${escapedWord}" title="Nghe phát âm">🔊</button>
           ${isSaved ? `
             <button type="button" class="icon-btn" data-action="edit" data-word="${escapedWord}" title="Chỉnh sửa nghĩa / ví dụ" style="font-size:0.9rem; padding:4px;">
               ✏️
@@ -786,19 +869,39 @@ function renderTable() {
                 }
             });
         }
+
+        // CEFR filter selector listener
+        const cefrFilterEl = document.getElementById('cefrFilter');
+        if (cefrFilterEl) {
+            cefrFilterEl.addEventListener('change', () => {
+                updateTable();
+            });
+        }
     }
 }
 
 function updateTable() {
     const searchTerm = searchBox.value.toLowerCase().trim();
+    const cefrFilterEl = document.getElementById('cefrFilter');
+    const cefrFilterVal = cefrFilterEl ? cefrFilterEl.value : 'all';
 
-    currentFilteredData = searchTerm
-        ? tableData.filter(item => item.word.toLowerCase().includes(searchTerm))
-        : [...tableData];
+    currentFilteredData = tableData.filter(item => {
+        if (searchTerm && !item.word.toLowerCase().includes(searchTerm)) {
+            return false;
+        }
+        if (cefrFilterVal !== 'all') {
+            const lvl = (item.cefr || 'C2').toUpperCase();
+            if (cefrFilterVal === 'hide-a1-a2') return lvl !== 'A1' && lvl !== 'A2';
+            if (cefrFilterVal === 'b1-plus') return lvl === 'B1' || lvl === 'B2' || lvl === 'C1' || lvl === 'C2';
+            if (cefrFilterVal === 'b2-plus') return lvl === 'B2' || lvl === 'C1' || lvl === 'C2';
+            if (cefrFilterVal === 'c1-plus') return lvl === 'C1' || lvl === 'C2';
+        }
+        return true;
+    });
 
     if (currentFilteredData.length === 0) {
         if (!searchTerm) {
-            tableBody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding: 30px; color: #888;">No words to display</td></tr>';
+            tableBody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding: 30px; color: #888;">Không có từ nào phù hợp với bộ lọc</td></tr>';
         } else {
             const savedSet = new Set(savedWords.map(w => w.toLowerCase()));
             const isSaved = savedSet.has(searchTerm.toLowerCase());
@@ -806,7 +909,7 @@ function updateTable() {
 
             tableBody.innerHTML = `
                 <tr>
-                    <td colspan="5" style="text-align:center; padding: 35px 20px;">
+                    <td colspan="6" style="text-align:center; padding: 35px 20px;">
                         <div style="max-width: 500px; margin: 0 auto; display: flex; flex-direction: column; align-items: center; gap: 12px;">
                             <div style="font-size: 1.05rem; color: #a8a8b3;">
                                 Không tìm thấy <strong>'${escapedTerm}'</strong> trong tài liệu này.
@@ -873,6 +976,12 @@ function updateTable() {
                 aVal = parseFloat(a.percentage) || 0;
                 bVal = parseFloat(b.percentage) || 0;
                 break;
+            case 'cefr': {
+                const cefrOrder = { A1: 1, A2: 2, B1: 3, B2: 4, C1: 5, C2: 6 };
+                aVal = cefrOrder[(a.cefr || 'C2').toUpperCase()] || 99;
+                bVal = cefrOrder[(b.cefr || 'C2').toUpperCase()] || 99;
+                break;
+            }
         }
 
         if (sortColumn === 'word') {
@@ -1298,30 +1407,72 @@ searchBox.addEventListener('input', () => {
     }, 150);
 });
 
+function escapeCsvField(val) {
+    if (val === null || val === undefined) return '""';
+    const str = String(val);
+    return `"${str.replace(/"/g, '""')}"`;
+}
+
 exportBtn.addEventListener('click', () => {
     const data = getAggregatedData();
     if (!data.results.length) return;
 
     const savedSet = new Set(savedWords);
-    const csv = [
-        ['Rank', 'Word', 'Count', 'Percentage', 'Saved'],
-        ...data.results.map((item, idx) => [
-            item.rank || (idx + 1),
-            item.word,
-            item.count,
-            item.percentage + '%',
-            savedSet.has(item.word) ? 'Yes' : ''
-        ])
-    ].map(row => row.join(',')).join('\n');
+    const rows = [
+        ['Rank', 'Word', 'CEFR', 'Count', 'Percentage', 'Saved', 'Meaning'].map(escapeCsvField),
+        ...data.results.map((item, idx) => {
+            const meta = savedMetadata[item.word.toLowerCase()] || {};
+            return [
+                item.rank || (idx + 1),
+                item.word,
+                item.cefr || '',
+                item.count,
+                item.percentage + '%',
+                savedSet.has(item.word) ? 'Yes' : '',
+                meta.meaning || ''
+            ].map(escapeCsvField);
+        })
+    ].map(row => row.join(',')).join('\r\n');
 
-    const blob = new Blob([csv], { type: 'text/csv' });
+    const blob = new Blob(['\uFEFF' + rows], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'word-frequency-analysis.csv';
+    a.download = `word-frequency-${Date.now()}.csv`;
     a.click();
     URL.revokeObjectURL(url);
 });
+
+// Anki Deck Export (Tab-separated format with Front, Back, Tags)
+const exportAnkiBtn = document.getElementById('exportAnkiBtn');
+if (exportAnkiBtn) {
+    exportAnkiBtn.addEventListener('click', () => {
+        const data = getAggregatedData();
+        if (!data.results.length) return;
+
+        const lines = data.results.map(item => {
+            const meta = savedMetadata[item.word.toLowerCase()] || {};
+            const meaning = meta.meaning || '';
+            const cefr = item.cefr ? `[${item.cefr}]` : '';
+            const rawContext = Array.isArray(item.context) && item.context.length > 0 
+                ? (item.context[0].text || item.context[0])
+                : (meta.context || '');
+            const safeContext = rawContext ? String(rawContext).replace(/\t/g, ' ').trim() : '';
+            const back = `<div>${escapeHtml(meaning)}</div>${cefr ? `<div style="color:#667eea; font-weight:600; margin:4px 0;">${cefr}</div>` : ''}${safeContext ? `<div style="font-style:italic; margin-top:6px; color:#555;">"${escapeHtml(safeContext)}"</div>` : ''}`;
+            const tag = `wfa ${item.cefr ? `cefr-${item.cefr.toLowerCase()}` : 'cefr-c2'}`;
+            return `${item.word}\t${back}\t${tag}`;
+        });
+
+        const blob = new Blob([lines.join('\n')], { type: 'text/tab-separated-values;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `anki-deck-${Date.now()}.txt`;
+        a.click();
+        URL.revokeObjectURL(url);
+        showSuccess('Đã xuất file Anki Deck (.txt)! Mở Anki -> File -> Import để học.');
+    });
+}
 
 // ==========================================
 // New Analysis

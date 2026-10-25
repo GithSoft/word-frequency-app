@@ -3,7 +3,7 @@
  * Tokenizes text and analyzes word frequency
  */
 
-// Common English stopwords
+// Common English stopwords (expanded comprehensive ISO & NLP set)
 const STOPWORDS = new Set([
   'the', 'be', 'to', 'of', 'and', 'a', 'in', 'that', 'have', 'i',
   'it', 'for', 'not', 'on', 'with', 'he', 'as', 'you', 'do', 'at',
@@ -15,8 +15,21 @@ const STOPWORDS = new Set([
   'could', 'them', 'see', 'other', 'than', 'then', 'now', 'look',
   'only', 'come', 'its', 'over', 'think', 'also', 'back', 'after',
   'use', 'two', 'how', 'our', 'work', 'first', 'well', 'way', 'even',
-  'new', 'want', 'because', 'any', 'these', 'give', 'day', 'most', 'us'
+  'new', 'want', 'because', 'any', 'these', 'give', 'day', 'most', 'us',
+  'am', 'is', 'are', 'was', 'were', 'been', 'being', 'has', 'had',
+  'having', 'does', 'did', 'doing', 'shall', 'should', 'cannot',
+  'might', 'must', 'myself', 'himself', 'herself', 'itself',
+  'ourselves', 'themselves', 'yourself', 'yourselves', 'whom', 'whose',
+  'where', 'why', 'here', 'above', 'below', 'between',
+  'both', 'each', 'few', 'more', 'own', 'same', 'such', 'too', 'very',
+  'again', 'further', 'once', 'during', 'before', 'through',
+  'under', 'until', 'while', 'against', 'down', 'off', 'throughout'
 ]);
+
+let dictService = null;
+try {
+  dictService = require('./dictionary-service');
+} catch (_) {}
 
 const abbrRegex = /\b(Mr|Mrs|Ms|Dr|Prof|Sr|Jr|vs|etc|i\.e|e\.g)\.$/i;
 const singleLetterRegex = /\b[A-Za-z]\.$/;
@@ -98,8 +111,8 @@ async function analyzeWordFrequency(text, options = {}) {
     skipContext = false
   } = options;
 
-  // Stream regex matching directly over text to avoid creating large intermediate arrays
-  const regex = /\b[a-zA-Z]+\b/g;
+  // Unicode-aware regex matching letters, diacritics, and internal contractions (' or ’)
+  const regex = /\p{L}+(?:['’]\p{L}+)*/gu;
   let match;
   const frequencyMap = new Map();
   let totalWords = 0;
@@ -133,9 +146,52 @@ async function analyzeWordFrequency(text, options = {}) {
       word,
       count,
       percentage: totalWords > 0 ? ((count / totalWords) * 100).toFixed(2) : 0,
+      cefr: null,
       context: [] // Empty initially
     }))
     .sort((a, b) => b.count - a.count);
+
+  // Compute CEFR Profiling (Book Readiness Radar)
+  let cefrStats = {
+    counts: { A1: 0, A2: 0, B1: 0, B2: 0, C1: 0, C2: 0 },
+    percentages: { A1: '0.0', A2: '0.0', B1: '0.0', B2: '0.0', C1: '0.0', C2: '0.0' },
+    overallLevel: 'B1'
+  };
+
+  if (dictService && dictService.getCefrBatch) {
+    try {
+      const allWords = results.map(r => r.word);
+      const cefrMap = await dictService.getCefrBatch(allWords);
+      let totalCategorized = 0;
+
+      results.forEach(item => {
+        const lvl = cefrMap[item.word] || null;
+        item.cefr = lvl;
+        if (lvl && cefrStats.counts[lvl] !== undefined) {
+          cefrStats.counts[lvl] += item.count;
+          totalCategorized += item.count;
+        } else {
+          cefrStats.counts.C2 += item.count;
+          totalCategorized += item.count;
+        }
+      });
+
+      for (const [lvl, count] of Object.entries(cefrStats.counts)) {
+        cefrStats.percentages[lvl] = totalCategorized > 0
+          ? ((count / totalCategorized) * 100).toFixed(1)
+          : '0.0';
+      }
+
+      const b2Plus = (cefrStats.counts.B2 + cefrStats.counts.C1 + cefrStats.counts.C2) / (totalCategorized || 1);
+      const c1Plus = (cefrStats.counts.C1 + cefrStats.counts.C2) / (totalCategorized || 1);
+      if (c1Plus > 0.15) cefrStats.overallLevel = 'C1 (Advanced)';
+      else if (b2Plus > 0.35) cefrStats.overallLevel = 'B2 (Upper Intermediate)';
+      else if (b2Plus > 0.15) cefrStats.overallLevel = 'B1 (Intermediate)';
+      else cefrStats.overallLevel = 'A2 (Elementary)';
+    } catch (cefrErr) {
+      console.warn('[Analyzer] CEFR batch profiling warning:', cefrErr.message);
+    }
+  }
 
   // If we're skipping context, return early
   if (skipContext) {
@@ -148,6 +204,7 @@ async function analyzeWordFrequency(text, options = {}) {
       results,
       totalWords,
       uniqueWords: frequencyMap.size,
+      cefrStats,
       stats: {
         totalWordsAnalyzed,
         wordsAfterFiltering: totalWords,
@@ -180,6 +237,7 @@ async function analyzeWordFrequency(text, options = {}) {
     results,
     totalWords,
     uniqueWords: frequencyMap.size,
+    cefrStats,
     stats: {
       totalWordsAnalyzed,
       wordsAfterFiltering: totalWords,

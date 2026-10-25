@@ -159,8 +159,10 @@ async function lookup(word) {
 
     const target = word.toLowerCase().trim();
     if (!target) {
-        return { word: '', phonetic: '', meanings: [], examples: [], source: 'none' };
+        return { word: '', phonetic: '', meanings: [], examples: [], source: 'none', cefr: null };
     }
+
+    const cefrLevel = await getCefrLevel(target);
 
     // Step 1: Query entries table (offline dictionary)
     try {
@@ -171,7 +173,8 @@ async function lookup(word) {
                 phonetic: entryRow.phonetic || '',
                 meanings: safeJsonParse(entryRow.meanings),
                 examples: safeJsonParse(entryRow.examples),
-                source: 'offline_lingoes'
+                source: 'offline_lingoes',
+                cefr: cefrLevel
             };
         }
     } catch (err) {
@@ -187,7 +190,8 @@ async function lookup(word) {
                 phonetic: cacheRow.phonetic || '',
                 meanings: safeJsonParse(cacheRow.meanings),
                 examples: safeJsonParse(cacheRow.examples),
-                source: cacheRow.source || 'online_cache'
+                source: cacheRow.source || 'online_cache',
+                cefr: cefrLevel
             };
         }
     } catch (err) {
@@ -206,7 +210,8 @@ async function lookup(word) {
                     phonetic: lemmaRow.phonetic || '',
                     meanings: safeJsonParse(lemmaRow.meanings),
                     examples: safeJsonParse(lemmaRow.examples),
-                    source: 'offline_lingoes'
+                    source: 'offline_lingoes',
+                    cefr: cefrLevel
                 };
             }
         }
@@ -318,7 +323,8 @@ async function lookup(word) {
                         phonetic: '',
                         meanings,
                         examples: [],
-                        source: 'online_datamuse'
+                        source: 'online_datamuse',
+                        cefr: cefrLevel
                     };
                 }
             }
@@ -333,7 +339,8 @@ async function lookup(word) {
         phonetic: '',
         meanings: [],
         examples: [],
-        source: 'none'
+        source: 'none',
+        cefr: cefrLevel
     };
 }
 
@@ -350,9 +357,70 @@ async function close() {
     }
 }
 
+/**
+ * CEFR level lookup for individual word
+ */
+async function getCefrLevel(word) {
+    if (!word) return null;
+    const target = word.toLowerCase().trim();
+    try {
+        const row = await dbGet('SELECT level FROM cefr_words WHERE word = ? LIMIT 1;', [target]);
+        if (row && row.level) return row.level;
+        const variants = getMorphologicalVariants(target);
+        for (const v of variants) {
+            const vRow = await dbGet('SELECT level FROM cefr_words WHERE word = ? LIMIT 1;', [v]);
+            if (vRow && vRow.level) return vRow.level;
+        }
+    } catch (_) {}
+    return null;
+}
+
+/**
+ * Batch CEFR level lookup for array of words (optimized for frequency analysis)
+ */
+async function getCefrBatch(words) {
+    if (!words || !words.length) return {};
+    try {
+        const database = await getDb();
+        const unique = Array.from(new Set(words.map(w => w.toLowerCase().trim()))).filter(Boolean);
+        const result = {};
+        const CHUNK_SIZE = 500;
+        for (let i = 0; i < unique.length; i += CHUNK_SIZE) {
+            const chunk = unique.slice(i, i + CHUNK_SIZE);
+            const placeholders = chunk.map(() => '?').join(',');
+            const rows = await new Promise((resolve, reject) => {
+                database.all(`SELECT word, level FROM cefr_words WHERE word IN (${placeholders});`, chunk, (err, rows) => {
+                    if (err) return reject(err);
+                    resolve(rows || []);
+                });
+            });
+            (rows || []).forEach(r => {
+                result[r.word] = r.level;
+            });
+        }
+        for (const w of unique) {
+            if (!result[w]) {
+                const variants = getMorphologicalVariants(w);
+                for (const v of variants) {
+                    if (result[v]) {
+                        result[w] = result[v];
+                        break;
+                    }
+                }
+            }
+        }
+        return result;
+    } catch (e) {
+        console.warn('[DictionaryService] getCefrBatch error:', e.message);
+        return {};
+    }
+}
+
 module.exports = {
     lookup,
     close,
     getDb,
-    getMorphologicalVariants
+    getMorphologicalVariants,
+    getCefrLevel,
+    getCefrBatch
 };

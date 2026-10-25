@@ -2163,3 +2163,211 @@ body {
   color: #ffffff;
   font-weight: 600;
 }
+
+/* ==========================================
+   CEFR Radar & Level Badges
+   ========================================== */
+.cefr-radar-card {
+  margin-bottom: 1.5rem;
+  padding: 1.25rem 1.5rem;
+}
+
+.cefr-radar-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.cefr-radar-title {
+  font-size: 1.15rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0 0 4px 0;
+}
+
+.cefr-radar-desc {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  margin: 0;
+}
+
+.cefr-badge-large {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: #fff;
+  padding: 6px 16px;
+  border-radius: 20px;
+  font-weight: 600;
+  font-size: 0.95rem;
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+}
+
+.cefr-progress-bar {
+  display: flex;
+  height: 14px;
+  border-radius: 7px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.08);
+  margin-bottom: 12px;
+}
+
+.cefr-bar-segment {
+  height: 100%;
+  transition: width 0.5s ease-in-out;
+}
+
+.seg-a1 { background: #10b981; }
+.seg-a2 { background: #3b82f6; }
+.seg-b1 { background: #f59e0b; }
+.seg-b2 { background: #ec4899; }
+.seg-c1 { background: #8b5cf6; }
+.seg-c2 { background: #6366f1; }
+
+.cefr-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.dot-a1 { background: #10b981; }
+.dot-a2 { background: #3b82f6; }
+.dot-b1 { background: #f59e0b; }
+.dot-b2 { background: #ec4899; }
+.dot-c1 { background: #8b5cf6; }
+.dot-c2 { background: #6366f1; }
+
+.badge-cefr {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+.badge-a1 { background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.35); }
+.badge-a2 { background: rgba(59, 130, 246, 0.15); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.35); }
+.badge-b1 { background: rgba(245, 158, 11, 0.15); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.35); }
+.badge-b2 { background: rgba(236, 72, 153, 0.15); color: #f472b6; border: 1px solid rgba(236, 72, 153, 0.35); }
+.badge-c1 { background: rgba(139, 92, 246, 0.15); color: #a78bfa; border: 1px solid rgba(139, 92, 246, 0.35); }
+.badge-c2 { background: rgba(99, 102, 241, 0.15); color: #818cf8; border: 1px solid rgba(99, 102, 241, 0.35); }
+.badge-cefr-empty { color: var(--text-muted); font-size: 0.8rem; }
+
+.cefr-filter-select {
+  background: var(--glass-bg);
+  color: var(--text-primary);
+  border: 1px solid var(--glass-border);
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 0.85rem;
+  outline: none;
+  cursor: pointer;
+}
+
+.tts-btn {
+  font-size: 15px;
+  padding: 4px;
+  min-width: 32px;
+  min-height: 32px;
+  cursor: pointer;
+  opacity: 0.85;
+  transition: opacity var(--transition-fast), transform var(--transition-fast);
+}
+
+.tts-btn:hover, .tts-btn:active {
+  opacity: 1;
+  transform: scale(1.15);
+}
+
+/* Multi-Screen Mobile & Responsive Styles */
+@media screen and (max-width: 768px) {
+  .table-controls {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+  
+  .table-controls .search-input {
+    width: 100%;
+  }
+
+  .table-controls .cefr-filter-select {
+    width: 100%;
+  }
+
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+  }
+
+  .stat-card {
+    padding: 12px;
+  }
+
+  .stat-value {
+    font-size: 1.35rem;
+  }
+
+  .modal-content {
+    width: 95vw !important;
+    max-width: 95vw !important;
+    max-height: 90vh !important;
+    overflow-y: auto !important;
+  }
+
+  .flashcard-container {
+    padding: 1rem;
+    min-height: 380px;
+  }
+
+  .flashcard {
+    min-height: 260px;
+  }
+
+  .fc-rating-buttons {
+    display: grid !important;
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 8px !important;
+    width: 100% !important;
+  }
+
+  .fc-rating-btn {
+    padding: 12px 8px !important;
+    font-size: 0.9rem !important;
+    min-height: 44px !important;
+  }
+}
+
+@media screen and (max-width: 480px) {
+  .stats-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .header-actions {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .cefr-legend {
+    gap: 8px;
+    font-size: 0.78rem;
+  }
+}

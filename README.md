@@ -43,8 +43,8 @@ A modern web app to help language learners analyze books/documents, extract high
 
 ```bash
 # Clone repository
-git clone https://github.com/tackelua/word-frequency-analyzer.git
-cd word-frequency-analyzer
+git clone https://github.com/GithSoft/word-frequency-app.git
+cd word-frequency-app
 
 # Install dependencies
 npm install

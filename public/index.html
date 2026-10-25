@@ -3,10 +3,20 @@
 
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>WordRadar - Smart Lexical Profiler & Book Readiness Radar</title>
   <meta name="description"
     content="WordRadar: Smart Lexical Profiler. Scan books, assess CEFR difficulty, and extract high-yield vocabulary.">
+
+  <!-- PWA & Mobile Meta Tags -->
+  <link rel="manifest" href="/manifest.json">
+  <link rel="icon" type="image/svg+xml" href="/icons/icon.svg">
+  <link rel="apple-touch-icon" href="/icons/icon.svg">
+  <meta name="theme-color" content="#0f172a">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="WordRadar">
 
   <!-- Google Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -102,9 +112,14 @@
           <div class="cefr-radar-header">
             <div>
               <h3 class="cefr-radar-title">📊 Book Readiness Radar (CEFR Lexical Profile)</h3>
-              <p class="cefr-radar-desc">Tỷ lệ độ phủ từ vựng theo khung tham chiếu Châu Âu (A1 ➔ C2)</p>
+              <p class="cefr-radar-desc">Tỷ lệ độ phủ từ vựng theo khung tham chiếu Châu Âu (A1 ➔ C2) &amp; Độ sẵn sàng đọc sách</p>
             </div>
-            <div class="cefr-badge-large" id="cefrSummaryBadge">B1 Intermediate</div>
+            <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+              <div class="readiness-pill" id="readinessPill" title="Mức độ từ vựng quen thuộc (A1-B2 + Từ đã biết của bạn). Đạt 95% là có thể đọc trôi chảy không cần tra từ điển.">
+                🎯 Sẵn sàng: <b id="readinessScore">0%</b>
+              </div>
+              <div class="cefr-badge-large" id="cefrSummaryBadge">B1 Intermediate</div>
+            </div>
           </div>
           <div class="cefr-progress-bar" id="cefrProgressBar">
             <div class="cefr-bar-segment seg-a1" id="barA1" style="width: 0%" title="A1 (Beginner)"></div>
@@ -132,8 +147,30 @@
 
         <!-- Data Table -->
         <div class="glass-card table-card">
+          <!-- View Switcher Tabs -->
+          <div class="table-view-tabs">
+            <button id="tabWords" class="table-view-tab active" type="button">
+              <span>🔤 Từ vựng đơn</span>
+              <span id="wordsCountBadge" class="tab-badge">0</span>
+            </button>
+            <button id="tabCollocations" class="table-view-tab" type="button">
+              <span>🔗 Cụm từ (Collocations)</span>
+              <span id="collocCountBadge" class="tab-badge">0</span>
+            </button>
+            <button id="tabSeriesProgression" class="table-view-tab" type="button" style="display: none;">
+              <span>📚 Từ mới tập sau (Series Delta)</span>
+              <span id="seriesDeltaBadge" class="tab-badge">0</span>
+            </button>
+          </div>
+
           <div class="table-header">
-            <h3 class="table-title">Word Frequency Data</h3>
+            <div class="table-title-area">
+              <h3 class="table-title" id="tableTitleDisplay">Word Frequency Data</h3>
+              <label class="known-filter-toggle" title="Ẩn các từ bạn đã biết để tập trung vào từ mới">
+                <input type="checkbox" id="hideKnownCheckbox">
+                <span>Ẩn từ đã biết (<span id="knownCountBadge">0</span>)</span>
+              </label>
+            </div>
             <div class="table-controls">
               <!-- File Checkboxes -->
               <div id="fileSelector" class="file-selector-container">

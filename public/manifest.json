@@ -1,0 +1,29 @@
+{
+  "name": "WordRadar - Smart Lexical Profiler",
+  "short_name": "WordRadar",
+  "description": "Pre-reading lexical profiler & book readiness radar. Scan foreign e-books, assess CEFR difficulty, and extract high-yield vocabulary.",
+  "start_url": "/",
+  "id": "/",
+  "display": "standalone",
+  "background_color": "#0b0f19",
+  "theme_color": "#0f172a",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["education", "books", "productivity"],
+  "shortcuts": [
+    {
+      "name": "Review Flashcards",
+      "short_name": "Review",
+      "description": "Start spaced repetition flashcard review",
+      "url": "/#review",
+      "icons": [{ "src": "/icons/icon.svg", "sizes": "any" }]
+    }
+  ]
+}

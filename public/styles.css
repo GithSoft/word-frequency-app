@@ -2428,3 +2428,151 @@ body {
     justify-content: center;
   }
 }
+
+/* ==========================================
+   Table View Switcher Tabs & Known Words Toggle
+   ========================================== */
+.table-view-tabs {
+  display: flex;
+  gap: 8px;
+  padding: 1rem 1.5rem 0.5rem 1.5rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.table-view-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.table-view-tab {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #94a3b8;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 0.88rem;
+  font-weight: 500;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+  transition: all 0.2s ease;
+}
+
+.table-view-tab:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #f1f5f9;
+}
+
+.table-view-tab.active {
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.3), rgba(56, 189, 248, 0.2));
+  border-color: #6366f1;
+  color: #ffffff;
+  font-weight: 600;
+}
+
+.tab-badge {
+  background: rgba(255, 255, 255, 0.15);
+  padding: 2px 7px;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  color: #e2e8f0;
+}
+
+.table-view-tab.active .tab-badge {
+  background: rgba(99, 102, 241, 0.5);
+  color: #ffffff;
+}
+
+.table-title-area {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.known-filter-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85rem;
+  color: #94a3b8;
+  cursor: pointer;
+  background: rgba(255, 255, 255, 0.05);
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  user-select: none;
+}
+
+.known-filter-toggle input[type="checkbox"] {
+  accent-color: #10b981;
+  cursor: pointer;
+}
+
+.known-btn {
+  background: transparent;
+  border: none;
+  font-size: 1.1rem;
+  cursor: pointer;
+  opacity: 0.6;
+  padding: 4px;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+
+.known-btn:hover {
+  opacity: 1;
+  transform: scale(1.15);
+}
+
+.known-btn.is-known {
+  opacity: 1;
+  filter: drop-shadow(0 0 4px #10b981);
+}
+
+tr.is-known-row {
+  opacity: 0.45;
+}
+
+tr.is-known-row td.col-word,
+tr.is-known-row .word-text {
+  text-decoration: line-through;
+  color: #64748b;
+}
+
+/* Collocation pill tag */
+.colloc-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  border-radius: 4px;
+  background: rgba(56, 189, 248, 0.15);
+  color: #38bdf8;
+  border: 1px solid rgba(56, 189, 248, 0.3);
+  margin-left: 6px;
+}
+
+/* Book Readiness Pill */
+.readiness-pill {
+  background: rgba(16, 185, 129, 0.15);
+  border: 1px solid rgba(16, 185, 129, 0.4);
+  color: #10b981;
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 0.88rem;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.1);
+}
+
+.readiness-pill b {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #34d399;
+}

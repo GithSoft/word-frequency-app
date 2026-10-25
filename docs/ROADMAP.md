@@ -63,8 +63,14 @@ Instead of forcing users to read entire books in a web browser, `words.githsoft.
   - 1-click generation of visual 16:9 infographic cards summarizing a book's lexical fingerprint, readiness gauge, CEFR bars, and key gatekeeper vocabulary for social sharing.
 - [x] **Collocation & Phrasal Verb Extraction:**
   - Bigram collocation pattern matching to surface key multi-word phrases and idiomatic expressions across sentences.
-- [ ] **Multi-Book / Series Corpus Aggregation:**
-  - Analyze an entire book series (e.g. *Harry Potter*, *A Song of Ice and Fire*) to track progressive vocabulary.
+- [x] **Multi-Book / Series Corpus Aggregation & Progressive Delta:**
+  - Multi-file series progression analysis (e.g. *Harry Potter*, *A Song of Ice and Fire*) to track sequential new vocabulary introduced in sequels.
+  - Dedicated table view tabs: Single Words, Collocations & Phrases, and Series Delta.
+- [x] **Personalized Vocabulary Filtering & Book Readiness Radar:**
+  - Mark known words (`✅` / `👁️`) to exclude familiar terms from study decks.
+  - Dynamic Book Readiness score calibrated to user's personal known words + A1–B2 baseline toward the 95% fluency threshold.
+- [x] **PWA & Offline Web Shell:**
+  - Full Web App Manifest, vector adaptive icons, and Service Worker stale-while-revalidate shell for mobile installation.
 
 ---
 

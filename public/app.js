@@ -43,6 +43,78 @@ const fileSelector = document.getElementById('fileSelector');
 const savedCountEl = document.getElementById('savedCount');
 const contextModalEl = document.getElementById('contextModal');
 
+// ==========================================
+// PWA & Service Worker Registration
+// ==========================================
+if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator && typeof location !== 'undefined' && location.protocol.startsWith('http')) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js')
+            .then(reg => console.log('WordRadar ServiceWorker registered:', reg.scope))
+            .catch(() => {});
+    });
+}
+
+// ==========================================
+// Known Words (Personal Lexicon / Exclusion)
+// ==========================================
+let knownWords = new Set(JSON.parse(localStorage.getItem('wordradar_known_words') || '[]'));
+
+function toggleKnownWord(word) {
+    if (!word) return;
+    const lower = word.toLowerCase().trim();
+    if (knownWords.has(lower)) {
+        knownWords.delete(lower);
+        showSuccess(`Đã bỏ đánh dấu "${word}" khỏi danh sách đã biết.`);
+    } else {
+        knownWords.add(lower);
+        showSuccess(`Đã đánh dấu "${word}" là từ đã biết!`);
+    }
+    localStorage.setItem('wordradar_known_words', JSON.stringify(Array.from(knownWords)));
+
+    const knownBadge = document.getElementById('knownCountBadge');
+    if (knownBadge) knownBadge.textContent = knownWords.size.toLocaleString();
+
+    invalidateAggregatedData();
+    renderTable();
+    updateStats();
+}
+window.toggleKnownWord = toggleKnownWord;
+
+// ==========================================
+// Table View Tabs (Words / Collocations / Series)
+// ==========================================
+let currentTableView = 'words'; // 'words' | 'collocations' | 'series'
+const tabWords = document.getElementById('tabWords');
+const tabCollocations = document.getElementById('tabCollocations');
+const tabSeriesProgression = document.getElementById('tabSeriesProgression');
+const tableTitleDisplay = document.getElementById('tableTitleDisplay');
+const hideKnownCheckbox = document.getElementById('hideKnownCheckbox');
+
+function setTableView(view) {
+    currentTableView = view;
+    if (tabWords) tabWords.classList.toggle('active', view === 'words');
+    if (tabCollocations) tabCollocations.classList.toggle('active', view === 'collocations');
+    if (tabSeriesProgression) tabSeriesProgression.classList.toggle('active', view === 'series');
+
+    if (tableTitleDisplay) {
+        if (view === 'collocations') tableTitleDisplay.textContent = 'Collocations & Phrases';
+        else if (view === 'series') tableTitleDisplay.textContent = 'Series Progression (New Vocabulary in Sequel)';
+        else tableTitleDisplay.textContent = 'Word Frequency Data';
+    }
+
+    renderTable();
+}
+
+if (tabWords) tabWords.addEventListener('click', () => setTableView('words'));
+if (tabCollocations) tabCollocations.addEventListener('click', () => setTableView('collocations'));
+if (tabSeriesProgression) tabSeriesProgression.addEventListener('click', () => setTableView('series'));
+
+if (hideKnownCheckbox) {
+    hideKnownCheckbox.addEventListener('change', () => {
+        updateTable();
+    });
+}
+
 function escapeHtml(str) {
     if (!str) return '';
     return String(str)
@@ -86,6 +158,8 @@ function highlightWordInText(text, word) {
 // ==========================================
 function init() {
     updateHeaderSavedCount();
+    const knownBadge = document.getElementById('knownCountBadge');
+    if (knownBadge) knownBadge.textContent = knownWords.size.toLocaleString();
     const hasFiles = Object.keys(filesData).length > 0;
     const hasSaved = savedWords.length > 0;
 
@@ -517,6 +591,9 @@ function updateStats() {
             const badgeEl = document.getElementById('cefrSummaryBadge');
             if (badgeEl) badgeEl.textContent = cefrStats.overallLevel;
 
+            const readinessEl = document.getElementById('readinessScore');
+            if (readinessEl) readinessEl.textContent = `${cefrStats.readinessPct || 0}%`;
+
             const p = cefrStats.percentages || {};
             const setWidth = (id, val) => {
                 const el = document.getElementById(id);
@@ -622,11 +699,69 @@ function getAggregatedData() {
     else if (b2Plus > 0.15) overallLevel = 'B1 Intermediate';
     else overallLevel = 'A2 Elementary';
 
+    // Calculate personalized Book Readiness (A1-B2 words + user known words)
+    let familiarTokens = 0;
+    results.forEach(item => {
+        const lvl = (item.cefr || 'C2').toUpperCase();
+        const isFamiliar = (lvl === 'A1' || lvl === 'A2' || lvl === 'B1' || lvl === 'B2') || knownWords.has(item.word.toLowerCase());
+        if (isFamiliar) familiarTokens += item.count;
+    });
+    const readinessPct = totalWords > 0 ? Math.min(100, Math.round((familiarTokens / totalWords) * 100)) : 0;
+
     const cefrStats = {
         counts: cefrCounts,
         percentages: cefrPercentages,
-        overallLevel
+        overallLevel,
+        readinessPct
     };
+
+    // Aggregate collocations & multi-book series progression
+    const collocMap = new Map();
+    const fileWordSets = [];
+
+    Object.entries(filesData).forEach(([fileName, file]) => {
+        if (!selectedFiles.has(fileName)) return;
+
+        const currentFileWords = new Set();
+        (file.analysis?.results || []).forEach(item => {
+            currentFileWords.add(item.word.toLowerCase());
+        });
+
+        if (file.analysis?.collocations && Array.isArray(file.analysis.collocations)) {
+            file.analysis.collocations.forEach(c => {
+                collocMap.set(c.phrase, (collocMap.get(c.phrase) || 0) + c.count);
+            });
+        }
+
+        fileWordSets.push({ fileName, words: currentFileWords });
+    });
+
+    const collocations = Array.from(collocMap.entries())
+        .map(([phrase, count], idx) => ({
+            rank: idx + 1,
+            word: phrase,
+            count,
+            percentage: totalWords > 0 ? ((count / totalWords) * 100).toFixed(2) : '0.00',
+            cefr: null,
+            isCollocation: true,
+            context: []
+        }))
+        .sort((a, b) => b.count - a.count);
+
+    collocations.forEach((c, idx) => c.rank = idx + 1);
+
+    // Series progression delta (Words introduced in latest selected file not present in earlier ones)
+    let seriesDelta = [];
+    if (fileWordSets.length >= 2) {
+        const earlierWords = new Set();
+        for (let i = 0; i < fileWordSets.length - 1; i++) {
+            fileWordSets[i].words.forEach(w => earlierWords.add(w));
+        }
+        const latestFile = fileWordSets[fileWordSets.length - 1];
+        seriesDelta = results
+            .filter(item => latestFile.words.has(item.word.toLowerCase()) && !earlierWords.has(item.word.toLowerCase()))
+            .map((item, idx) => ({ ...item, rank: idx + 1, isSeriesDelta: true }));
+    }
 
     // Filter for saved words only
     if (showSavedOnly) {
@@ -663,6 +798,8 @@ function getAggregatedData() {
 
     cachedAggregatedData = {
         results,
+        collocations,
+        seriesDelta,
         totalWords,
         uniqueWords: wordMap.size,
         cefrStats
@@ -760,15 +897,25 @@ const CHUNK_SIZE = 100;
 
 function renderRow(item, savedSet) {
     const isSaved = savedSet.has(item.word);
+    const isKnown = knownWords.has(item.word.toLowerCase());
     const countDisplay = typeof item.count === 'number' && item.count > 0 ? item.count.toLocaleString() : '0';
     const rankDisplay = item.rank !== undefined ? item.rank : '—';
     const pctDisplay = item.percentage !== undefined ? item.percentage : '0.00';
     const escapedWord = escapeHtml(item.word);
     const isPhrase = isPhraseItem(item.word);
     const meta = savedMetadata[item.word.toLowerCase()];
-    const badgeHtml = isPhrase
-        ? `<span class="badge badge-phrase" title="Cụm từ / Phrase">Phrase</span>`
-        : (isSaved ? `<span class="badge badge-word" title="Từ đơn">Word</span>` : '');
+
+    let badgeHtml = '';
+    if (item.isCollocation) {
+        badgeHtml = `<span class="colloc-badge" title="Cụm từ trích xuất tự động">Collocation</span>`;
+    } else if (item.isSeriesDelta) {
+        badgeHtml = `<span class="badge" style="background:rgba(234, 179, 8, 0.2); color:#eab308; border:1px solid rgba(234, 179, 8, 0.4);" title="Từ mới trong tập tiếp theo">Series New</span>`;
+    } else if (isPhrase) {
+        badgeHtml = `<span class="badge badge-phrase" title="Cụm từ / Phrase">Phrase</span>`;
+    } else if (isSaved) {
+        badgeHtml = `<span class="badge badge-word" title="Từ đơn">Word</span>`;
+    }
+
     const meaningPreviewHtml = meta?.meaning
         ? `<div class="phrase-meaning-preview" title="${escapeHtml(meta.meaning)}">${escapeHtml(meta.meaning)}</div>`
         : '';
@@ -777,7 +924,7 @@ function renderRow(item, savedSet) {
         : `<span class="badge-cefr-empty">—</span>`;
 
     return `
-    <tr class="word-row" data-word="${escapedWord}">
+    <tr class="word-row ${isKnown ? 'is-known-row' : ''}" data-word="${escapedWord}">
       <td data-label="#">${rankDisplay}</td>
       <td class="word-cell" data-label="Word">
         <div>
@@ -791,6 +938,12 @@ function renderRow(item, savedSet) {
       <td data-label="%">${pctDisplay}%</td>
       <td class="col-actions" data-label="Actions">
         <div style="display:inline-flex; align-items:center; gap:6px;">
+          <button type="button" class="known-btn ${isKnown ? 'is-known' : ''}" 
+                  data-action="toggle-known" 
+                  data-word="${escapedWord}" 
+                  title="${isKnown ? 'Bỏ đánh dấu từ đã biết' : 'Đánh dấu từ đã biết (Personal Vocabulary)'}">
+            ${isKnown ? '✅' : '👁️'}
+          </button>
           <button type="button" class="icon-btn tts-btn" data-action="tts" data-word="${escapedWord}" title="Nghe phát âm">🔊</button>
           ${isSaved ? `
             <button type="button" class="icon-btn" data-action="edit" data-word="${escapedWord}" title="Chỉnh sửa nghĩa / ví dụ" style="font-size:0.9rem; padding:4px;">
@@ -809,6 +962,31 @@ function renderRow(item, savedSet) {
   `;
 }
 
+function updateTabBadges(data) {
+    const wordsBadge = document.getElementById('wordsCountBadge');
+    const collocBadge = document.getElementById('collocCountBadge');
+    const seriesBadge = document.getElementById('seriesDeltaBadge');
+    const seriesTab = document.getElementById('tabSeriesProgression');
+    const knownBadge = document.getElementById('knownCountBadge');
+
+    if (wordsBadge) wordsBadge.textContent = (data.results?.length || 0).toLocaleString();
+    if (collocBadge) collocBadge.textContent = (data.collocations?.length || 0).toLocaleString();
+    if (knownBadge) knownBadge.textContent = knownWords.size.toLocaleString();
+
+    const selectedFileCount = Array.from(selectedFiles).length;
+    if (seriesTab) {
+        if (selectedFileCount >= 2) {
+            seriesTab.style.display = 'inline-flex';
+            if (seriesBadge) seriesBadge.textContent = (data.seriesDelta?.length || 0).toLocaleString();
+        } else {
+            seriesTab.style.display = 'none';
+            if (currentTableView === 'series') {
+                setTableView('words');
+            }
+        }
+    }
+}
+
 function appendNextChunk() {
     if (renderedCount >= currentFilteredData.length) return;
     const nextChunk = currentFilteredData.slice(renderedCount, renderedCount + CHUNK_SIZE);
@@ -820,7 +998,14 @@ function appendNextChunk() {
 
 function renderTable() {
     const data = getAggregatedData();
-    tableData = data.results;
+    if (currentTableView === 'collocations') {
+        tableData = data.collocations || [];
+    } else if (currentTableView === 'series') {
+        tableData = data.seriesDelta || [];
+    } else {
+        tableData = data.results || [];
+    }
+    updateTabBadges(data);
     updateTable();
 
     if (!fileSelector.dataset.initialized) {
@@ -884,8 +1069,12 @@ function updateTable() {
     const searchTerm = searchBox.value.toLowerCase().trim();
     const cefrFilterEl = document.getElementById('cefrFilter');
     const cefrFilterVal = cefrFilterEl ? cefrFilterEl.value : 'all';
+    const shouldHideKnown = hideKnownCheckbox && hideKnownCheckbox.checked;
 
     currentFilteredData = tableData.filter(item => {
+        if (shouldHideKnown && knownWords.has(item.word.toLowerCase())) {
+            return false;
+        }
         if (searchTerm && !item.word.toLowerCase().includes(searchTerm)) {
             return false;
         }
@@ -1364,6 +1553,8 @@ if (tableBody) {
                 openEditPhraseModal(word);
             } else if (action === 'save') {
                 toggleSave(word);
+            } else if (action === 'toggle-known') {
+                toggleKnownWord(word);
             }
             return;
         }

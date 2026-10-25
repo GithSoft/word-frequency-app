@@ -2074,49 +2074,119 @@ const fcDefinition = document.getElementById('fcDefinition');
 const fcContext = document.getElementById('fcContext');
 const fcProgressText = document.getElementById('fcProgressText');
 const savedCard = document.getElementById('savedCard');
+const openFlashcardsBtn = document.getElementById('openFlashcardsBtn');
 
 if (savedCard) {
     savedCard.addEventListener('click', openFlashcards);
 }
+if (openFlashcardsBtn) {
+    openFlashcardsBtn.addEventListener('click', openFlashcards);
+}
 
-document.getElementById('closeFlashcardsBtn').addEventListener('click', () => {
-    flashcardsSection.style.display = 'none';
-});
+const closeFlashcardsBtn = document.getElementById('closeFlashcardsBtn');
+if (closeFlashcardsBtn) {
+    closeFlashcardsBtn.addEventListener('click', () => {
+        if (flashcardsSection) flashcardsSection.style.display = 'none';
+    });
+}
 
-flashcard.addEventListener('click', (e) => {
-    // Don't flip if clicking buttons
-    if (e.target.tagName === 'BUTTON') return;
+if (flashcardsSection) {
+    flashcardsSection.addEventListener('click', (e) => {
+        if (e.target === flashcardsSection) {
+            flashcardsSection.style.display = 'none';
+        }
+    });
+}
 
-    isFlipped = !isFlipped;
-    flashcard.classList.toggle('flipped', isFlipped);
-});
+if (flashcard) {
+    flashcard.addEventListener('click', (e) => {
+        // Don't flip if clicking buttons
+        if (e.target.tagName === 'BUTTON') return;
+
+        isFlipped = !isFlipped;
+        flashcard.classList.toggle('flipped', isFlipped);
+    });
+}
+
+// Keyboard shortcuts for Flashcard review (Space to flip, 1-4 for SRS, Esc to close)
+if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+    window.addEventListener('keydown', (e) => {
+        if (!flashcardsSection || flashcardsSection.style.display !== 'flex') return;
+
+        if (e.key === 'Escape') {
+            e.preventDefault();
+            flashcardsSection.style.display = 'none';
+            return;
+        }
+
+        if (e.key === ' ' || e.key === 'Enter') {
+            e.preventDefault();
+            isFlipped = !isFlipped;
+            if (flashcard) flashcard.classList.toggle('flipped', isFlipped);
+            return;
+        }
+
+        if (isFlipped) {
+            if (e.key === '1') {
+                e.preventDefault();
+                handleSRS('again');
+            } else if (e.key === '2') {
+                e.preventDefault();
+                handleSRS('hard');
+            } else if (e.key === '3') {
+                e.preventDefault();
+                handleSRS('good');
+            } else if (e.key === '4') {
+                e.preventDefault();
+                handleSRS('easy');
+            }
+        }
+    });
+}
 
 function openFlashcards() {
-    if (savedWords.length === 0) {
-        showError('No saved words to review!');
-        return;
+    if (savedWords.length > 0) {
+        // Build review queue
+        const now = Date.now();
+        reviewQueue = savedWords.filter(word => {
+            const data = srsData[word];
+            // If no data, it's new (due now). If data, check nextReview.
+            return !data || data.nextReview <= now;
+        });
+
+        if (reviewQueue.length === 0) {
+            reviewQueue = [...savedWords].sort(() => Math.random() - 0.5).slice(0, 15);
+            showSuccess('Bạn đã hoàn thành các từ đến hạn! Đang mở ôn tập ngẫu nhiên.');
+        } else {
+            // Sort by due date (overdue first)
+            reviewQueue.sort((a, b) => {
+                const timeA = srsData[a] ? srsData[a].nextReview : 0;
+                const timeB = srsData[b] ? srsData[b].nextReview : 0;
+                return timeA - timeB;
+            });
+        }
+    } else {
+        // Fallback: If no saved words, use top words from currently analyzed book if available
+        const currentData = (currentFilteredData && currentFilteredData.length > 0)
+            ? currentFilteredData
+            : (tableData || []);
+
+        if (currentData.length > 0) {
+            reviewQueue = currentData
+                .filter(item => item.word && typeof item.word === 'string')
+                .slice(0, 20)
+                .map(item => item.word);
+
+            showSuccess('Chưa có từ trong Sổ từ. Đang mở Flashcards cho Top từ vựng trong sách!');
+        } else {
+            showError('Chưa có từ vựng! Hãy tải sách lên hoặc bấm biểu tượng ⭐ trên các từ để bắt đầu luyện Flashcard.');
+            return;
+        }
     }
 
-    // Build review queue
-    const now = Date.now();
-    reviewQueue = savedWords.filter(word => {
-        const data = srsData[word];
-        // If no data, it's new (due now). If data, check nextReview.
-        return !data || data.nextReview <= now;
-    });
-
-    if (reviewQueue.length === 0) {
-        // Optional: Allow reviewing all if nothing due? 
-        // For now, let's just say "All caught up! Reviewing random words."
-        reviewQueue = [...savedWords].sort(() => Math.random() - 0.5).slice(0, 10);
-        showError('All caught up! Starting random review.');
-    } else {
-        // Sort by due date (overdue first)
-        reviewQueue.sort((a, b) => {
-            const timeA = srsData[a] ? srsData[a].nextReview : 0;
-            const timeB = srsData[b] ? srsData[b].nextReview : 0;
-            return timeA - timeB;
-        });
+    if (!reviewQueue || reviewQueue.length === 0) {
+        showError('Không có từ vựng nào để ôn tập!');
+        return;
     }
 
     currentCardIndex = 0;
@@ -2310,6 +2380,15 @@ function handleSRS(rating) {
     };
 
     localStorage.setItem('wfa_srs', JSON.stringify(srsData));
+
+    // Ensure word is added to savedWords so it persists in the user's SRS review deck
+    if (!savedWords.includes(word)) {
+        savedWords.push(word);
+        saveSavedWords();
+        updateHeaderSavedCount();
+        const savedEl = document.getElementById('savedCount');
+        if (savedEl) savedEl.textContent = savedWords.length.toLocaleString();
+    }
 
     // Next card
     currentCardIndex++;

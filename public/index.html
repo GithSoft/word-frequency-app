@@ -45,7 +45,7 @@
         </h1>
         <div class="header-actions">
           <button id="quickAddBtn" class="secondary-btn small" title="Thêm từ hoặc cụm từ mới">➕ Thêm từ/cụm từ</button>
-          <button id="quickReviewBtn" class="secondary-btn small" title="Ôn tập Flashcards">⭐ Ôn tập (<span id="headerSavedCount">0</span>)</button>
+          <button id="quickReviewBtn" class="secondary-btn small" title="Luyện thẻ Flashcards (SRS)">🎴 Flashcards (<span id="headerSavedCount">0</span>)</button>
           <button id="loginBtn" class="secondary-btn small" title="Login with Email OTP">Passwordless Login</button>
           <div id="userProfile" class="user-menu" style="display: none;">
             <button id="menuToggle" class="menu-icon" title="User menu">⋮</button>
@@ -90,11 +90,11 @@
             </div>
           </div>
 
-          <div class="glass-card stat-card" id="savedCard" style="cursor: pointer;" title="Click to practice">
-            <div class="stat-icon">⭐</div>
+          <div class="glass-card stat-card" id="savedCard" style="cursor: pointer;" title="Bấm để mở Flashcards ôn tập">
+            <div class="stat-icon">🎴</div>
             <div class="stat-content">
               <h3 class="stat-value" id="savedCount">0</h3>
-              <p class="stat-label">Saved Words (Review)</p>
+              <p class="stat-label">Saved Words (Flashcards)</p>
             </div>
           </div>
 
@@ -187,6 +187,9 @@
               <button id="tableAddPhraseBtn" class="primary-btn-sm" title="Thêm từ hoặc cụm từ mới">
                 <span>➕ Thêm</span>
               </button>
+              <button id="openFlashcardsBtn" class="secondary-btn-sm" title="Luyện Flashcard (SRS SM-2)">
+                <span>🎴 Flashcards</span>
+              </button>
               <button id="shareBookDnaBtn" class="secondary-btn-sm" title="Xuất Thẻ ADN Sách để chia sẻ">
                 <span>🧬 Book DNA</span>
               </button>
@@ -246,8 +249,11 @@
     <section class="flashcards-section" id="flashcardsSection" style="display: none;">
       <div class="glass-card flashcard-container">
         <div class="flashcard-header">
-          <h2>Vocabulary Review</h2>
-          <button id="closeFlashcardsBtn" class="secondary-btn">Close</button>
+          <div>
+            <h2>🎴 Flashcard Review (SRS SM-2)</h2>
+            <p style="font-size: 0.8rem; color: #94a3b8; margin: 4px 0 0 0;">Phím tắt: Space (Lật) • 1-4 (Đánh giá) • Esc (Đóng)</p>
+          </div>
+          <button id="closeFlashcardsBtn" class="secondary-btn" title="Đóng Flashcards (Esc)">✕ Close</button>
         </div>
 
         <div id="flashcard" class="flashcard">

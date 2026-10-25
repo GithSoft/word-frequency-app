@@ -1950,25 +1950,93 @@ body {
   flex-wrap: wrap;
 }
 
-.primary-btn-sm {
-  background: var(--gradient-primary);
-  color: #fff;
-  border: none;
-  border-radius: var(--radius-sm);
-  padding: 6px 12px;
-  font-size: 0.825rem;
-  font-weight: 600;
-  cursor: pointer;
-  display: inline-flex;
+/* ==========================================
+   Table Action Buttons Unified Design
+   ========================================== */
+.table-btn-group {
+  display: flex;
   align-items: center;
-  gap: 4px;
-  transition: all var(--transition-fast);
-  white-space: nowrap;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
-.primary-btn-sm:hover {
+.table-action-btn,
+.primary-btn-sm,
+.secondary-btn-sm {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 13px;
+  border-radius: 8px;
+  font-size: 0.825rem;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  font-family: inherit;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  box-sizing: border-box;
+  text-decoration: none;
+  line-height: 1;
+}
+
+.table-action-btn:hover,
+.primary-btn-sm:hover,
+.secondary-btn-sm:hover {
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+}
+
+.table-action-btn:active,
+.primary-btn-sm:active,
+.secondary-btn-sm:active {
+  transform: translateY(0);
+}
+
+/* Primary Accent (➕ Thêm từ/cụm từ) */
+.table-action-btn.btn-primary,
+.primary-btn-sm {
+  background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 2px 6px rgba(99, 102, 241, 0.25);
+}
+
+.table-action-btn.btn-primary:hover,
+.primary-btn-sm:hover {
+  background: linear-gradient(135deg, #4f46e5 0%, #4338ca 100%);
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.45);
+}
+
+/* Feature Accent (🎴 Flashcards) */
+.table-action-btn.btn-feature {
+  background: rgba(16, 185, 129, 0.15);
+  border: 1px solid rgba(16, 185, 129, 0.4);
+  color: #34d399;
+  box-shadow: 0 2px 6px rgba(16, 185, 129, 0.15);
+}
+
+.table-action-btn.btn-feature:hover {
+  background: rgba(16, 185, 129, 0.28);
+  border-color: #10b981;
+  color: #ffffff;
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.35);
+}
+
+/* Neutral Secondary (🧬 Book DNA, 🗂️ Anki, 📥 CSV) */
+.table-action-btn.btn-secondary,
+.secondary-btn-sm {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: #e2e8f0;
+}
+
+.table-action-btn.btn-secondary:hover,
+.secondary-btn-sm:hover {
+  background: rgba(255, 255, 255, 0.14);
+  border-color: rgba(255, 255, 255, 0.3);
+  color: #ffffff;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
 }
 
 .badge-phrase {

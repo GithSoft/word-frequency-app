@@ -160,6 +160,18 @@ function init() {
     updateHeaderSavedCount();
     const knownBadge = document.getElementById('knownCountBadge');
     if (knownBadge) knownBadge.textContent = knownWords.size.toLocaleString();
+
+    // Fetch and sync active app version dynamically from server package.json
+    fetch('/api/version')
+        .then(res => res.json())
+        .then(data => {
+            const versionEl = document.getElementById('footerVersion');
+            if (versionEl && data.version) {
+                versionEl.textContent = `v${data.version}`;
+            }
+        })
+        .catch(() => {});
+
     const hasFiles = Object.keys(filesData).length > 0;
     const hasSaved = savedWords.length > 0;
 

@@ -79,9 +79,17 @@ app.use('/api/feedback', feedbackRoutes);
 // Initialize DB
 const { sequelize } = require('./src/models'); // This will sync tables
 
+// App package info
+const pkg = require('./package.json');
+
 // Health check endpoint
 app.get('/api/health', (req, res) => {
-    res.json({ status: 'ok', message: 'Word Frequency Analyzer API' });
+    res.json({ status: 'ok', name: pkg.name, version: pkg.version });
+});
+
+// App version endpoint
+app.get('/api/version', (req, res) => {
+    res.json({ name: pkg.name, version: pkg.version });
 });
 
 // In-memory cache for analysis results (bounded to max 50 entries)

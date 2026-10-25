@@ -1,16 +1,16 @@
 {
-  "name": "word-frequency-analyzer",
+  "name": "wordradar",
   "version": "1.0.0",
-  "description": "Modern web app for analyzing word frequency in documents",
+  "description": "WordRadar - Smart Lexical Profiler & Pre-Reading Companion",
   "main": "server.js",
   "scripts": {
     "dev": "nodemon server.js",
     "start": "node server.js",
     "stop": "lsof -ti:3000 | xargs kill -9 || echo 'No process on port 3000'",
-    "pm2:start": "pm2 start server.js --name word-frequency-analyzer",
-    "pm2:stop": "pm2 stop word-frequency-analyzer",
-    "pm2:delete": "pm2 delete word-frequency-analyzer",
-    "pm2:restart": "pm2 restart word-frequency-analyzer"
+    "pm2:start": "pm2 start server.js --name wordradar",
+    "pm2:stop": "pm2 stop wordradar",
+    "pm2:delete": "pm2 delete wordradar",
+    "pm2:restart": "pm2 restart wordradar"
   },
   "keywords": [
     "word-frequency",

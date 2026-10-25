@@ -45,8 +45,8 @@ A smart lexical profiler and pre-reading companion to help language learners sca
 
 ```bash
 # Clone repository
-git clone https://github.com/GithSoft/word-frequency-app.git
-cd word-frequency-app
+git clone https://github.com/GithSoft/wordradar.git
+cd wordradar
 
 # Install dependencies
 npm install

@@ -91,7 +91,7 @@ router.post('/', upload.array('media', 5), async (req, res) => {
         const token = process.env.GITHUB_TOKEN;
         const repoId = process.env.GITHUB_REPO_ID || '1139152631';
         const repoOwner = process.env.GITHUB_REPO_OWNER || 'GithSoft';
-        const repoName = process.env.GITHUB_REPO_NAME || 'word-frequency-app';
+        const repoName = process.env.GITHUB_REPO_NAME || 'wordradar';
 
         // 3. Upload Attachments directly to GitHub User-Attachments CDN (0 commit, 0 local disk)
         const uploadedAttachments = [];

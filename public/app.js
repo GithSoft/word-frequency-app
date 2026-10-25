@@ -1475,6 +1475,298 @@ if (exportAnkiBtn) {
 }
 
 // ==========================================
+// Book DNA Infographic Card Generator
+// ==========================================
+const shareBookDnaBtn = document.getElementById('shareBookDnaBtn');
+const bookDnaModal = document.getElementById('bookDnaModal');
+const closeBookDnaBtn = document.getElementById('closeBookDnaBtn');
+const copyDnaImgBtn = document.getElementById('copyDnaImgBtn');
+const downloadDnaImgBtn = document.getElementById('downloadDnaImgBtn');
+const bookDnaCanvas = document.getElementById('bookDnaCanvas');
+
+function renderBookDnaCanvas() {
+    if (!bookDnaCanvas) return;
+    const ctx = bookDnaCanvas.getContext('2d');
+    const width = 1200;
+    const height = 675;
+    bookDnaCanvas.width = width;
+    bookDnaCanvas.height = height;
+
+    const data = getAggregatedData();
+    const results = data.results || [];
+    const stats = currentAnalysisData?.cefrStats || {};
+    const totalTokens = data.totalWords || results.reduce((acc, r) => acc + (r.count || 0), 0);
+    const uniqueWords = results.length;
+
+    // Document title
+    let docTitle = 'Vocabulary Lexical Profile';
+    if (uploadedFiles && uploadedFiles.length > 0) {
+        docTitle = uploadedFiles.map(f => f.name).join(', ');
+        if (docTitle.length > 40) docTitle = docTitle.substring(0, 37) + '...';
+    }
+
+    // 1. Background with sleek gradients
+    const bgGrad = ctx.createLinearGradient(0, 0, width, height);
+    bgGrad.addColorStop(0, '#0f172a');
+    bgGrad.addColorStop(0.5, '#1e1b4b');
+    bgGrad.addColorStop(1, '#090d16');
+    ctx.fillStyle = bgGrad;
+    ctx.fillRect(0, 0, width, height);
+
+    // Decorative radial aura
+    const aura = ctx.createRadialGradient(width * 0.8, height * 0.2, 50, width * 0.8, height * 0.2, 400);
+    aura.addColorStop(0, 'rgba(99, 102, 241, 0.18)');
+    aura.addColorStop(1, 'rgba(0, 0, 0, 0)');
+    ctx.fillStyle = aura;
+    ctx.fillRect(0, 0, width, height);
+
+    // Outer border
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.12)';
+    ctx.lineWidth = 4;
+    ctx.strokeRect(20, 20, width - 40, height - 40);
+
+    // 2. Header
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 32px Inter, sans-serif';
+    ctx.fillText('🛰️ WordRadar', 60, 80);
+
+    ctx.fillStyle = '#94a3b8';
+    ctx.font = '500 18px Inter, sans-serif';
+    ctx.fillText('Pre-Reading Lexical Profiler', 300, 80);
+
+    ctx.fillStyle = '#6366f1';
+    ctx.font = '600 18px Inter, sans-serif';
+    ctx.textAlign = 'right';
+    ctx.fillText('wordradar.githsoft.com', width - 60, 80);
+    ctx.textAlign = 'left';
+
+    // Divider
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(60, 105);
+    ctx.lineTo(width - 60, 105);
+    ctx.stroke();
+
+    // 3. Document Name & Primary Metrics
+    ctx.fillStyle = '#e2e8f0';
+    ctx.font = 'bold 36px Inter, sans-serif';
+    ctx.fillText(docTitle, 60, 160);
+
+    // Mini stats badges
+    function drawStatPill(x, y, label, val) {
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.05)';
+        ctx.beginPath();
+        ctx.roundRect(x, y, 220, 50, 8);
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+        ctx.stroke();
+
+        ctx.fillStyle = '#94a3b8';
+        ctx.font = '14px Inter, sans-serif';
+        ctx.fillText(label, x + 16, y + 24);
+
+        ctx.fillStyle = '#38bdf8';
+        ctx.font = 'bold 18px Inter, sans-serif';
+        ctx.fillText(val, x + 16, y + 44);
+    }
+    drawStatPill(60, 185, 'TOTAL TOKENS', totalTokens.toLocaleString());
+    drawStatPill(300, 185, 'UNIQUE LEMMAS', uniqueWords.toLocaleString());
+
+    const readinessPct = stats.readinessPct || 85;
+    drawStatPill(540, 185, 'READINESS COVERAGE', `${readinessPct}% (Target: 95%)`);
+
+    // 4. CEFR Difficulty & Readiness Card (Right side)
+    const cardX = 800;
+    const cardY = 140;
+    ctx.fillStyle = 'rgba(30, 41, 59, 0.7)';
+    ctx.beginPath();
+    ctx.roundRect(cardX, cardY, 340, 180, 16);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(99, 102, 241, 0.3)';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    ctx.fillStyle = '#94a3b8';
+    ctx.font = '14px Inter, sans-serif';
+    ctx.fillText('ESTIMATED BOOK LEVEL', cardX + 24, cardY + 36);
+
+    const level = stats.primaryLevel || 'B2';
+    const levelColors = {
+        'A1': '#10b981', 'A2': '#06b6d4', 'B1': '#3b82f6',
+        'B2': '#6366f1', 'C1': '#8b5cf6', 'C2': '#ec4899', 'Off-list': '#64748b'
+    };
+    ctx.fillStyle = levelColors[level] || '#6366f1';
+    ctx.font = 'bold 44px Inter, sans-serif';
+    ctx.fillText(`CEFR ${level}`, cardX + 24, cardY + 90);
+
+    ctx.fillStyle = '#cbd5e1';
+    ctx.font = '14px Inter, sans-serif';
+    ctx.fillText(`Radar: ${readinessPct}% of words familiar`, cardX + 24, cardY + 125);
+    ctx.fillStyle = '#64748b';
+    ctx.font = '12px Inter, sans-serif';
+    ctx.fillText('Focus on B2/C1 keywords for 95% flow', cardX + 24, cardY + 148);
+
+    // 5. CEFR Breakdown Horizontal Bar
+    const barX = 60;
+    const barY = 280;
+    const barW = 700;
+    const barH = 28;
+
+    ctx.fillStyle = '#94a3b8';
+    ctx.font = 'bold 14px Inter, sans-serif';
+    ctx.fillText('LEXICAL DISTRIBUTION (OXFORD 5000 PROFILE)', barX, barY - 12);
+
+    const distribution = stats.distribution || { A1: 40, A2: 25, B1: 15, B2: 10, C1: 5, 'Off-list': 5 };
+    let curX = barX;
+    const levels = ['A1', 'A2', 'B1', 'B2', 'C1', 'Off-list'];
+
+    // Draw background track
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.05)';
+    ctx.beginPath();
+    ctx.roundRect(barX, barY, barW, barH, 8);
+    ctx.fill();
+
+    levels.forEach((lvl, idx) => {
+        const pct = distribution[lvl] || 0;
+        const segmentW = (pct / 100) * barW;
+        if (segmentW > 0) {
+            ctx.fillStyle = levelColors[lvl] || '#64748b';
+            ctx.beginPath();
+            if (idx === 0) ctx.roundRect(curX, barY, segmentW, barH, [8, 0, 0, 8]);
+            else if (idx === levels.length - 1) ctx.roundRect(curX, barY, segmentW, barH, [0, 8, 8, 0]);
+            else ctx.fillRect(curX, barY, segmentW, barH);
+            ctx.fill();
+            curX += segmentW;
+        }
+    });
+
+    // Legend below bar
+    let legX = barX;
+    levels.forEach(lvl => {
+        const pct = distribution[lvl] || 0;
+        ctx.fillStyle = levelColors[lvl];
+        ctx.beginPath();
+        ctx.arc(legX + 6, barY + 48, 5, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = '#e2e8f0';
+        ctx.font = '13px Inter, sans-serif';
+        ctx.fillText(`${lvl}: ${pct}%`, legX + 16, barY + 52);
+        legX += 115;
+    });
+
+    // 6. Key Gatekeeper Vocabulary (Top 6 B2/C1 words)
+    ctx.fillStyle = '#e2e8f0';
+    ctx.font = 'bold 18px Inter, sans-serif';
+    ctx.fillText('🔑 KEY GATEKEEPER WORDS TO UNLOCK THIS BOOK', 60, 400);
+
+    const keyWords = results
+        .filter(r => r.cefr === 'B2' || r.cefr === 'C1' || r.cefr === 'B1')
+        .slice(0, 6);
+
+    const fallbackWords = results.slice(0, 6);
+    const wordsToShow = keyWords.length >= 3 ? keyWords : fallbackWords;
+
+    let chipX = 60;
+    let chipY = 430;
+    const chipW = 340;
+    const chipH = 68;
+
+    wordsToShow.forEach((w, i) => {
+        const col = i % 3;
+        const row = Math.floor(i / 3);
+        const cx = 60 + col * (chipW + 25);
+        const cy = chipY + row * (chipH + 15);
+
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.04)';
+        ctx.beginPath();
+        ctx.roundRect(cx, cy, chipW, chipH, 10);
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
+        ctx.stroke();
+
+        // Level badge pill
+        const lvl = w.cefr || 'B2';
+        ctx.fillStyle = levelColors[lvl] || '#6366f1';
+        ctx.beginPath();
+        ctx.roundRect(cx + 12, cy + 12, 42, 22, 6);
+        ctx.fill();
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 11px Inter, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(lvl, cx + 33, cy + 27);
+        ctx.textAlign = 'left';
+
+        // Word text
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 18px Inter, sans-serif';
+        ctx.fillText(w.word, cx + 64, cy + 29);
+
+        // Meaning or phonetic
+        ctx.fillStyle = '#94a3b8';
+        ctx.font = '13px Inter, sans-serif';
+        const meaningText = (w.meaning || w.phonetic || `Frequency: ${w.count}x`).substring(0, 36);
+        ctx.fillText(meaningText, cx + 16, cy + 52);
+    });
+
+    // 7. Footer Brand Note
+    ctx.fillStyle = '#64748b';
+    ctx.font = '13px Inter, sans-serif';
+    ctx.fillText('Analyzed by WordRadar • Open-source Pre-Reading Companion for Serious Readers', 60, height - 38);
+
+    ctx.textAlign = 'right';
+    const dateStr = new Date().toLocaleDateString('vi-VN', { year: 'numeric', month: '2-digit', day: '2-digit' });
+    ctx.fillText(`Report Date: ${dateStr}`, width - 60, height - 38);
+    ctx.textAlign = 'left';
+}
+
+if (shareBookDnaBtn && bookDnaModal) {
+    shareBookDnaBtn.addEventListener('click', () => {
+        renderBookDnaCanvas();
+        bookDnaModal.style.display = 'flex';
+    });
+
+    if (closeBookDnaBtn) {
+        closeBookDnaBtn.addEventListener('click', () => {
+            bookDnaModal.style.display = 'none';
+        });
+    }
+
+    bookDnaModal.addEventListener('click', (e) => {
+        if (e.target === bookDnaModal) bookDnaModal.style.display = 'none';
+    });
+
+    if (downloadDnaImgBtn) {
+        downloadDnaImgBtn.addEventListener('click', () => {
+            if (!bookDnaCanvas) return;
+            const link = document.createElement('a');
+            link.download = `WordRadar-BookDNA-${Date.now()}.png`;
+            link.href = bookDnaCanvas.toDataURL('image/png');
+            link.click();
+            showSuccess('Đã tải ảnh Thẻ ADN Sách thành công!');
+        });
+    }
+
+    if (copyDnaImgBtn) {
+        copyDnaImgBtn.addEventListener('click', async () => {
+            if (!bookDnaCanvas) return;
+            try {
+                bookDnaCanvas.toBlob(async (blob) => {
+                    if (!blob) throw new Error('Canvas toBlob failed');
+                    await navigator.clipboard.write([
+                        new ClipboardItem({ 'image/png': blob })
+                    ]);
+                    showSuccess('Đã sao chép ảnh Thẻ ADN Sách vào Clipboard!');
+                }, 'image/png');
+            } catch (err) {
+                if (downloadDnaImgBtn) downloadDnaImgBtn.click();
+            }
+        });
+    }
+}
+
+// ==========================================
 // New Analysis
 // ==========================================
 newAnalysisBtn.addEventListener('click', () => {
@@ -1719,44 +2011,98 @@ async function loadCard() {
             fcContext.textContent = isPhrase ? 'Custom added phrase (no book context excerpt available).' : 'Custom added word (no book context excerpt available).';
         }
     }
+
+    // 3. Update SM-2 Interval Preview on Action Buttons
+    updateSrsButtonLabels(word);
+}
+
+function formatSrsInterval(ms) {
+    if (ms <= 60 * 1000) return '<1m';
+    if (ms < 24 * 60 * 60 * 1000) return `${Math.max(1, Math.round(ms / (60 * 1000)))}m`;
+    const days = Math.round(ms / (24 * 60 * 60 * 1000));
+    if (days < 30) return `${days}d`;
+    return `${(days / 30).toFixed(1)}mo`;
+}
+
+function calculateNextIntervals(word) {
+    const ONE_MIN = 60 * 1000;
+    const ONE_DAY = 24 * 60 * 60 * 1000;
+    const item = srsData[word] || { interval: 0, reps: 0, ef: 2.5 };
+    const reps = item.reps || 0;
+    const ef = Math.max(1.3, item.ef || 2.5);
+    const curr = item.interval || 0;
+
+    const againInterval = ONE_MIN;
+    const hardInterval = curr === 0 ? ONE_DAY : Math.max(ONE_DAY, Math.round(curr * 1.2));
+
+    let goodInterval;
+    if (reps === 0) goodInterval = ONE_DAY;
+    else if (reps === 1) goodInterval = 6 * ONE_DAY;
+    else goodInterval = Math.round(curr * ef);
+
+    let easyInterval;
+    if (reps === 0) easyInterval = 4 * ONE_DAY;
+    else if (reps === 1) easyInterval = 10 * ONE_DAY;
+    else easyInterval = Math.round(curr * ef * 1.3);
+
+    return { againInterval, hardInterval, goodInterval, easyInterval };
+}
+
+function updateSrsButtonLabels(word) {
+    const { againInterval, hardInterval, goodInterval, easyInterval } = calculateNextIntervals(word);
+    const elAgain = document.getElementById('srsAgainTime');
+    const elHard = document.getElementById('srsHardTime');
+    const elGood = document.getElementById('srsGoodTime');
+    const elEasy = document.getElementById('srsEasyTime');
+    if (elAgain) elAgain.textContent = formatSrsInterval(againInterval);
+    if (elHard) elHard.textContent = formatSrsInterval(hardInterval);
+    if (elGood) elGood.textContent = formatSrsInterval(goodInterval);
+    if (elEasy) elEasy.textContent = formatSrsInterval(easyInterval);
 }
 
 function handleSRS(rating) {
     const word = reviewQueue[currentCardIndex];
-    let interval = 1; // Default 1 minute
-    let nextReview = Date.now();
-
-    // Simple SRS Algorithm
-    // existing: { interval (mins), multiplier }
-    // Hard: 1 min
-    // Good: 1 day (1440 mins) or curr * 2
-    // Easy: 4 days (5760 mins) or curr * 4
-
-    // Storing intervals in MINUTES
-    // 1 day = 1440 mins
+    if (!word) return;
 
     const ONE_MIN = 60 * 1000;
     const ONE_DAY = 24 * 60 * 60 * 1000;
 
-    let prevData = srsData[word] || { interval: 0, streak: 0 };
-    let newInterval = 0; // ms
+    let prev = srsData[word] || { interval: 0, reps: 0, ef: 2.5, streak: 0 };
+    let reps = prev.reps || 0;
+    let ef = Math.max(1.3, prev.ef || 2.5);
+    let curr = prev.interval || 0;
+    let newInterval = 0;
 
-    if (rating === 'hard') {
+    if (rating === 'again') {
+        reps = 0;
+        ef = Math.max(1.3, ef - 0.2);
         newInterval = ONE_MIN;
-        prevData.streak = 0;
+        prev.streak = 0;
+    } else if (rating === 'hard') {
+        reps = Math.max(1, reps);
+        ef = Math.max(1.3, ef - 0.15);
+        newInterval = curr === 0 ? ONE_DAY : Math.max(ONE_DAY, Math.round(curr * 1.2));
+        prev.streak = Math.max(1, prev.streak || 0);
     } else if (rating === 'good') {
-        if (prevData.streak === 0) newInterval = ONE_DAY; // 1 day
-        else newInterval = prevData.interval * 2;
-        prevData.streak++;
+        reps += 1;
+        if (reps === 1) newInterval = ONE_DAY;
+        else if (reps === 2) newInterval = 6 * ONE_DAY;
+        else newInterval = Math.round(curr * ef);
+        prev.streak = (prev.streak || 0) + 1;
     } else if (rating === 'easy') {
-        if (prevData.streak === 0) newInterval = 4 * ONE_DAY; // 4 days
-        else newInterval = prevData.interval * 4;
-        prevData.streak++;
+        reps += 1;
+        ef = Math.min(3.0, ef + 0.15);
+        if (reps === 1) newInterval = 4 * ONE_DAY;
+        else if (reps === 2) newInterval = 10 * ONE_DAY;
+        else newInterval = Math.round(curr * ef * 1.3);
+        prev.streak = (prev.streak || 0) + 1;
     }
 
     srsData[word] = {
         interval: newInterval,
-        streak: prevData.streak,
+        reps,
+        ef: Number(ef.toFixed(2)),
+        streak: prev.streak,
         nextReview: Date.now() + newInterval
     };
 

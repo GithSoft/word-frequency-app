@@ -36,11 +36,12 @@ const upload = multer({
             'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
             'application/msword',
             'text/plain',
-            'text/csv'
+            'text/csv',
+            'application/epub+zip'
         ];
 
         const ext = path.extname(file.originalname).toLowerCase();
-        const allowedExts = ['.pdf', '.docx', '.doc', '.txt', '.csv'];
+        const allowedExts = ['.pdf', '.docx', '.doc', '.txt', '.csv', '.epub'];
 
         if (allowedExts.includes(ext)) {
             cb(null, true);

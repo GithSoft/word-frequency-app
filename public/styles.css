@@ -1657,8 +1657,12 @@ body {
   transform: scale(1.05);
 }
 
-.srs-btn.hard {
+.srs-btn.again {
   background: #ef4444;
+}
+
+.srs-btn.hard {
+  background: #f59e0b;
 }
 
 .srs-btn.good {
@@ -2369,5 +2373,58 @@ body {
   .cefr-legend {
     gap: 8px;
     font-size: 0.78rem;
+  }
+}
+
+/* ==========================================
+   Book DNA Infographic Modal Styles
+   ========================================== */
+.dna-modal-content {
+  max-width: 900px !important;
+  width: 95% !important;
+  background: rgba(15, 23, 42, 0.95) !important;
+  border: 1px solid rgba(255, 255, 255, 0.15) !important;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7) !important;
+}
+
+.dna-desc {
+  color: #94a3b8;
+  font-size: 0.92rem;
+  margin-bottom: 1rem;
+}
+
+.dna-canvas-wrapper {
+  width: 100%;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: #0b0f19;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+}
+
+.dna-canvas-wrapper canvas {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.dna-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 1.25rem;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+
+@media screen and (max-width: 600px) {
+  .dna-actions {
+    justify-content: stretch;
+  }
+  .dna-actions button {
+    flex: 1 1 100%;
+    justify-content: center;
   }
 }

@@ -53,16 +53,16 @@ Instead of forcing users to read entire books in a web browser, `words.githsoft.
   - Book Readiness Coverage calculation & Radar progress bar against 95% comprehension threshold.
 - [x] **Anki Study Deck Export:**
   - 1-click export to Anki TSV format with word, phonetic, CEFR, meaning, frequency, and sample sentence context.
-- [ ] **SRS Engine Upgrade (Standard SM-2):**
-  - Replace naive fixed multipliers with SuperMemo-2 (SM-2) algorithm including Ease Factor (1.3–2.5).
+- [x] **SRS Engine Upgrade (Standard SM-2):**
+  - SuperMemo-2 (SM-2) algorithm with Ease Factor (1.3–3.0), quality scores (Again, Hard, Good, Easy) and human-readable interval previews.
 
-### 📈 Phase 3: Growth, Monetization & Advanced Analytics (Planned)
-- [ ] **Book DNA Shareable Cards:**
-  - 1-click generation of visual infographic cards summarizing a book's lexical fingerprint for social sharing.
-- [ ] **Collocation & Phrasal Verb Extraction:**
-  - N-gram and POS pattern matching for common multi-word units (`look up to`, `come up with`).
-- [ ] **EPUB & MOBI Client-Side Parsers:**
-  - In-browser parsing of DRM-free e-book formats without server upload overhead.
+### 📈 Phase 3: Growth, Monetization & Advanced Analytics
+- [x] **EPUB E-Book Parser:**
+  - Direct upload and fast chapter-by-chapter extraction of DRM-free `.epub` books with XML entity decoding.
+- [x] **Book DNA Shareable Cards:**
+  - 1-click generation of visual 16:9 infographic cards summarizing a book's lexical fingerprint, readiness gauge, CEFR bars, and key gatekeeper vocabulary for social sharing.
+- [x] **Collocation & Phrasal Verb Extraction:**
+  - Bigram collocation pattern matching to surface key multi-word phrases and idiomatic expressions across sentences.
 - [ ] **Multi-Book / Series Corpus Aggregation:**
   - Analyze an entire book series (e.g. *Harry Potter*, *A Song of Ice and Fire*) to track progressive vocabulary.
 

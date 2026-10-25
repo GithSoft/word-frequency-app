@@ -5,9 +5,11 @@ A smart lexical profiler and pre-reading companion to help language learners sca
 ## 🚀 Features & Roadmap
 
 ### Core Analysis & Visualization
-- [x] **Multi-Format Support**: Upload `.pdf`, `.docx`, `.txt`, `.csv` (Max 50MB).
+- [x] **Multi-Format Support**: Upload `.epub`, `.pdf`, `.docx`, `.txt`, `.csv` (Max 50MB).
 - [x] **Smart Analysis & CEFR Profiling**: Extract frequent words, tokenize with Unicode contractions/accents, classify by Oxford 5000 (A1–C1).
 - [x] **Book Readiness Radar**: Instant lexical distribution and readiness coverage bar against the 95% reading comprehension threshold.
+- [x] **Collocations & Phrases**: Automatic extraction of high-frequency bigrams and idiomatic multi-word units.
+- [x] **Book DNA Infographics**: 1-click generation of high-res 16:9 shareable cards summarizing lexical fingerprint, readiness score, and gatekeeper vocabulary.
 - [x] **Visualizations**: Interactive Word Cloud & detailed frequency statistics.
 - [x] **Data Tools**: Search, CEFR level filter, and sort word lists.
 - [x] **Export**: Download analysis results to CSV and 1-click **Anki TSV** flashcard format.
@@ -17,7 +19,7 @@ A smart lexical profiler and pre-reading companion to help language learners sca
 - [x] **Context Viewer**: Show original sentence/paragraph where word appears.
 - [x] **Instant Lookups**: Popup translation & auto-pronunciation (TTS).
 - [x] **CEFR Level Badges**: Color-coded CEFR badges (A1 to C1) for instant difficulty assessment.
-- [x] **Flashcards & SRS**: Built-in Spaced Repetition System for vocabulary review.
+- [x] **SuperMemo-2 (SM-2) Flashcards**: Standard SM-2 Spaced Repetition engine with Ease Factor (1.3–3.0) and dynamic interval previews (Again, Hard, Good, Easy).
 - [x] **Vocabulary Management**: Star/save words across documents (Cloud sync).
 
 ### System & UX
@@ -79,13 +81,15 @@ Detailed strategic initiatives, competitor comparison, and delivery phases are d
   - [x] Book Readiness Radar (95% comprehension threshold progress bar).
   - [x] Mobile-first UI overhaul (touch TTS buttons, responsive stacked cards view).
   - [x] CEFR level filtering & 1-click Anki TSV export for spaced repetition learning.
-- **Horizon 3 (Deep Linguistic Analysis - Planned)**:
-  - [ ] N-gram Collocation & Phrasal Verb extraction (POS tagging).
-  - [ ] Client-side in-browser EPUB/PDF parser (zero server payload).
-  - [ ] Custom vocabulary exclusion lists (skip known words).
+- **Horizon 3 (Deep Linguistic Analysis & Media Support - Completed)**:
+  - [x] N-gram Collocation & Phrasal Verb extraction (surface idiomatic bigrams).
+  - [x] Native EPUB e-book format parsing with chapter ordering and XML entity decoding.
+  - [x] Book DNA Shareable Infographics (16:9 canvas card generation for social sharing).
+  - [x] SuperMemo-2 (SM-2) Spaced Repetition engine upgrade with dynamic interval previews.
 - **Horizon 4 (Ecosystem & Platform - Planned)**:
   - [ ] PWA offline support & Kindle clippings import.
   - [ ] Web Reader with live instant context annotations.
+  - [ ] Standalone Cloudflare migration (`wordradar.pages.dev`).
 
 ## 📝 License
 

@@ -2,6 +2,7 @@ const { parsePDF } = require('./pdf-parser');
 const { parseDOCX } = require('./docx-parser');
 const { parseTXT } = require('./txt-parser');
 const { parseCSV } = require('./csv-parser');
+const { parseEPUB } = require('./epub-parser');
 
 /**
  * Parses a file based on its extension
@@ -15,6 +16,9 @@ async function parseFile(filePath, mimeType) {
     switch (ext) {
         case 'pdf':
             return await parsePDF(filePath);
+
+        case 'epub':
+            return await parseEPUB(filePath);
 
         case 'docx':
         case 'doc':

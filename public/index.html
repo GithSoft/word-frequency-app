@@ -150,6 +150,9 @@
               <button id="tableAddPhraseBtn" class="primary-btn-sm" title="Thêm từ hoặc cụm từ mới">
                 <span>➕ Thêm</span>
               </button>
+              <button id="shareBookDnaBtn" class="secondary-btn-sm" title="Xuất Thẻ ADN Sách để chia sẻ">
+                <span>🧬 Book DNA</span>
+              </button>
               <button id="exportAnkiBtn" class="secondary-btn-sm" title="Xuất file thẻ Anki (.txt tab-separated)">
                 <span>🗂️ Anki</span>
               </button>
@@ -191,8 +194,8 @@
           <div class="upload-icon">📄</div>
           <h2 class="upload-title">Drop your file here</h2>
           <p class="upload-subtitle">or click to browse</p>
-          <p class="upload-formats">PDF, DOCX, TXT, CSV • No size limit</p>
-          <input type="file" id="fileInput" accept=".pdf,.docx,.doc,.txt,.csv" multiple hidden>
+          <p class="upload-formats">EPUB, PDF, DOCX, TXT, CSV • Up to 50MB</p>
+          <input type="file" id="fileInput" accept=".pdf,.epub,.docx,.doc,.txt,.csv" multiple hidden>
         </div>
 
         <div class="upload-progress" id="uploadProgress" style="display: none;">
@@ -224,9 +227,10 @@
               <div id="fcDefinition" class="fc-content">Definition</div>
               <div id="fcContext" class="fc-context">Context example</div>
               <div class="fc-actions">
-                <button class="srs-btn hard" onclick="handleSRS('hard')">Hard (1m)</button>
-                <button class="srs-btn good" onclick="handleSRS('good')">Good (10m)</button>
-                <button class="srs-btn easy" onclick="handleSRS('easy')">Easy (4d)</button>
+                <button id="srsBtnAgain" class="srs-btn again" onclick="handleSRS('again')">Again (<span id="srsAgainTime">&lt;1m</span>)</button>
+                <button id="srsBtnHard" class="srs-btn hard" onclick="handleSRS('hard')">Hard (<span id="srsHardTime">1d</span>)</button>
+                <button id="srsBtnGood" class="srs-btn good" onclick="handleSRS('good')">Good (<span id="srsGoodTime">3d</span>)</button>
+                <button id="srsBtnEasy" class="srs-btn easy" onclick="handleSRS('easy')">Easy (<span id="srsEasyTime">7d</span>)</button>
               </div>
             </div>
           </div>
@@ -373,6 +377,30 @@
             <button type="button" id="savePhraseSubmitBtn" class="primary-btn">⭐ Lưu vào Sổ từ</button>
           </div>
         </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Book DNA Infographic Modal -->
+  <div class="modal-overlay" id="bookDnaModal" style="display: none;">
+    <div class="glass-card modal-content dna-modal-content">
+      <div class="modal-header">
+        <h3 class="modal-title">🧬 Book DNA Lexical Infographic</h3>
+        <button class="close-btn" id="closeBookDnaBtn">×</button>
+      </div>
+      <div class="modal-body dna-modal-body">
+        <p class="dna-desc">Thẻ tổng quan phân tích từ vựng & độ sẵn sàng đọc sách để chia sẻ hoặc lưu trữ:</p>
+        <div class="dna-canvas-wrapper">
+          <canvas id="bookDnaCanvas" width="1200" height="675"></canvas>
+        </div>
+        <div class="dna-actions">
+          <button type="button" id="copyDnaImgBtn" class="primary-btn">
+            <span>📋 Sao chép ảnh (Copy)</span>
+          </button>
+          <button type="button" id="downloadDnaImgBtn" class="secondary-btn">
+            <span>💾 Tải ảnh PNG</span>
+          </button>
+        </div>
       </div>
     </div>
   </div>

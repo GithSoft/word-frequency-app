@@ -115,6 +115,9 @@ async function analyzeWordFrequency(text, options = {}) {
   const regex = /\p{L}+(?:['’]\p{L}+)*/gu;
   let match;
   const frequencyMap = new Map();
+  const bigramMap = new Map();
+  let prevWord = null;
+  let prevEnd = -1;
   let totalWords = 0;
   let totalWordsAnalyzed = 0;
   let wordIdx = 0;
@@ -129,6 +132,24 @@ async function analyzeWordFrequency(text, options = {}) {
 
     const rawWord = match[0];
     const word = caseSensitive ? rawWord : rawWord.toLowerCase();
+    const curStart = match.index;
+
+    // Check sentence boundary separation for collocations
+    if (prevWord !== null) {
+      const boundarySlice = text.slice(prevEnd, curStart);
+      const crossesBoundary = /[.!?\n\r;:]/.test(boundarySlice);
+      if (!crossesBoundary) {
+        const isPrevStop = STOPWORDS.has(prevWord);
+        const isCurStop = STOPWORDS.has(word);
+        // Exclude purely stopword-stopword pairs (e.g. "it is", "in the") to surface meaningful content phrases
+        if ((!isPrevStop || !isCurStop) && prevWord.length >= 2 && word.length >= 2) {
+          const bigram = `${prevWord} ${word}`;
+          bigramMap.set(bigram, (bigramMap.get(bigram) || 0) + 1);
+        }
+      }
+    }
+    prevWord = word;
+    prevEnd = regex.lastIndex;
 
     // Filter by length
     if (word.length < minLength) continue;
@@ -139,6 +160,13 @@ async function analyzeWordFrequency(text, options = {}) {
     totalWords++;
     frequencyMap.set(word, (frequencyMap.get(word) || 0) + 1);
   }
+
+  // Top collocations
+  const collocations = Array.from(bigramMap.entries())
+    .filter(([_, count]) => count >= 2)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 50)
+    .map(([phrase, count]) => ({ phrase, count }));
 
   // Initial results without context
   let results = Array.from(frequencyMap.entries())
@@ -202,6 +230,7 @@ async function analyzeWordFrequency(text, options = {}) {
 
     return {
       results,
+      collocations,
       totalWords,
       uniqueWords: frequencyMap.size,
       cefrStats,
@@ -235,6 +264,7 @@ async function analyzeWordFrequency(text, options = {}) {
 
   return {
     results,
+    collocations,
     totalWords,
     uniqueWords: frequencyMap.size,
     cefrStats,

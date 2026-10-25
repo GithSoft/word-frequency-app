@@ -13,6 +13,14 @@ const Feedback = sequelize.define('Feedback', {
     email: {
         type: DataTypes.STRING,
         allowNull: true
+    },
+    issue_url: {
+        type: DataTypes.STRING,
+        allowNull: true
+    },
+    media: {
+        type: DataTypes.TEXT,
+        allowNull: true
     }
 });
 

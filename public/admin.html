@@ -130,7 +130,10 @@
                     <td>\${escapeHtml(new Date(item.createdAt).toLocaleDateString())}</td>
                     <td><span class="badge \${escapeHtml(item.type)}">\${escapeHtml(item.type)}</span></td>
                     <td>\${escapeHtml(item.email || (item.User ? item.User.email : 'Anonymous'))}</td>
-                    <td>\${escapeHtml(item.content)}</td>
+                    <td>
+                        <div>\${escapeHtml(item.content)}</div>
+                        \${item.issue_url ? \`<div style="margin-top: 4px;"><a href="\${escapeHtml(item.issue_url)}" target="_blank" rel="noopener noreferrer" style="color: #667eea; font-weight: 500; font-size: 0.85rem; text-decoration: underline;">🔗 View GitHub Issue #\${escapeHtml(item.issue_url.split('/').pop())}</a></div>\` : ''}
+                    </td>
                 </tr>
             \`).join('');
         }

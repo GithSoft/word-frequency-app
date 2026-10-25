@@ -1972,41 +1972,68 @@ if (closeFeedbackBtn) {
         const type = fbType.value;
         const content = fbContent.value.trim();
         const email = fbEmail.value.trim();
+        const honeypot = document.getElementById('fbHoneypot')?.value || '';
         const mediaInput = document.getElementById('fbMedia');
-        const mediaFiles = mediaInput.files;
+        const mediaFiles = mediaInput ? mediaInput.files : [];
 
-        if (!content) return showError('Please enter a message');
+        if (honeypot) {
+            // Anti-spam silent reject
+            feedbackModal.style.display = 'none';
+            return;
+        }
+
+        if (!content && (!mediaFiles || mediaFiles.length === 0)) {
+            return showError('Vui lòng nhập nội dung góp ý hoặc đính kèm ảnh chụp.');
+        }
 
         submitFeedbackBtn.textContent = 'Sending...';
+        submitFeedbackBtn.disabled = true;
         try {
             const formData = new FormData();
             formData.append('type', type);
             formData.append('content', content);
             if (email) formData.append('email', email);
 
+            // Client Diagnostics
+            const clientInfo = {
+                ua: navigator.userAgent,
+                screen: `${window.screen.width}x${window.screen.height}`,
+                lang: navigator.language || 'en',
+                timezone: Intl.DateTimeFormat ? Intl.DateTimeFormat().resolvedOptions().timeZone : '',
+                page: window.location.href
+            };
+            formData.append('client_info', JSON.stringify(clientInfo));
+
             // Append all selected files
-            for (let i = 0; i < mediaFiles.length; i++) {
-                formData.append('media', mediaFiles[i]);
+            if (mediaFiles && mediaFiles.length > 0) {
+                for (let i = 0; i < mediaFiles.length; i++) {
+                    formData.append('media', mediaFiles[i]);
+                }
             }
 
             const res = await fetch('/api/feedback', {
                 method: 'POST',
-                body: formData // Don't set Content-Type header, browser will set it with boundary
+                body: formData
             });
 
-            if (res.ok) {
-                showSuccess('Feedback sent! Thank you.');
+            const data = await res.json().catch(() => ({}));
+
+            if (res.ok && data.success) {
+                showSuccess('Cảm ơn bạn! Góp ý đã được tiếp nhận và tự động chuyển đến đội ngũ phát triển.');
                 feedbackModal.style.display = 'none';
                 fbContent.value = '';
                 fbEmail.value = '';
-                mediaInput.value = ''; // Clear file input
+                if (mediaInput) mediaInput.value = '';
+                const hpEl = document.getElementById('fbHoneypot');
+                if (hpEl) hpEl.value = '';
             } else {
-                showError('Failed to send feedback');
+                showError(data.error || 'Failed to send feedback');
             }
         } catch (e) {
             showError('Network error');
         } finally {
             submitFeedbackBtn.textContent = 'Submit';
+            submitFeedbackBtn.disabled = false;
         }
     });
 }

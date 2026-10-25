@@ -25,6 +25,16 @@ sequelize.sync().then(async () => {
         if (!colNames.has('notes')) {
             await sequelize.query("ALTER TABLE SavedWords ADD COLUMN notes TEXT;");
         }
+
+        // Auto-migrate Feedbacks columns if missing
+        const [fbColumns] = await sequelize.query("PRAGMA table_info(Feedbacks);");
+        const fbColNames = new Set(fbColumns.map(c => c.name));
+        if (!fbColNames.has('issue_url')) {
+            await sequelize.query("ALTER TABLE Feedbacks ADD COLUMN issue_url VARCHAR(255);");
+        }
+        if (!fbColNames.has('media')) {
+            await sequelize.query("ALTER TABLE Feedbacks ADD COLUMN media TEXT;");
+        }
     } catch (e) {
         console.warn('[DB Migration] Notice on column sync:', e.message);
     }

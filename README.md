@@ -1,6 +1,6 @@
-# Word Frequency Analyzer 📊
+# WordRadar 🛰️
 
-A modern web app to help language learners analyze books/documents, extract high-frequency vocabulary, and learn effectively.
+A smart lexical profiler and pre-reading companion to help language learners scan books, assess CEFR difficulty, extract high-yield vocabulary, and achieve 95% reading comprehension.
 
 ## 🚀 Features & Roadmap
 

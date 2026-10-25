@@ -1,5 +1,5 @@
 /**
- * Word Frequency Analyzer - Frontend Application
+ * WordRadar - Frontend Application
  * Handles file uploads, caching, vocabulary saving, and visualization
  */
 

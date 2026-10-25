@@ -1,6 +1,6 @@
-# 🗺️ Product Roadmap & Strategic Vision: Word Frequency Analyzer
+# 🗺️ Product Roadmap & Strategic Vision: WordRadar
 
-**Product:** `words.githsoft.com` (Word Frequency Analyzer)  
+**Product:** **WordRadar** (`wordradar.githsoft.com`, alias `words.githsoft.com`)  
 **Role / Owner:** GithSoft Ecosystem  
 **Target Audience:** Language Learners (B1 ➔ C1/C2), Exam Preppers (IELTS, TOEFL, GRE), Readers of Foreign E-Books & Technical Documentation (PMP, Medical, Tech).  
 **Last Updated:** October 2026  

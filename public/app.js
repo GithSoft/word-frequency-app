@@ -949,7 +949,7 @@ function renderRow(item, savedSet) {
       <td data-label="Count">${countDisplay}</td>
       <td data-label="%">${pctDisplay}%</td>
       <td class="col-actions" data-label="Actions">
-        <div style="display:inline-flex; align-items:center; gap:6px;">
+        <div style="display:inline-flex; align-items:center; gap:4px;">
           <button type="button" class="known-btn ${isKnown ? 'is-known' : ''}" 
                   data-action="toggle-known" 
                   data-word="${escapedWord}" 
@@ -957,17 +957,17 @@ function renderRow(item, savedSet) {
             ${isKnown ? '✅' : '👁️'}
           </button>
           <button type="button" class="icon-btn tts-btn" data-action="tts" data-word="${escapedWord}" title="Nghe phát âm">🔊</button>
-          ${isSaved ? `
-            <button type="button" class="icon-btn" data-action="edit" data-word="${escapedWord}" title="Chỉnh sửa nghĩa / ví dụ" style="font-size:0.9rem; padding:4px;">
-              ✏️
-            </button>
-          ` : ''}
           <button type="button" class="save-btn ${isSaved ? 'saved' : ''}" 
                   data-action="save"
                   data-word="${escapedWord}" 
                   title="${isSaved ? 'Xóa khỏi sổ từ' : 'Lưu từ/cụm từ'}">
             ${isSaved ? '⭐' : '☆'}
           </button>
+          ${isSaved ? `
+            <button type="button" class="icon-btn edit-btn" data-action="edit" data-word="${escapedWord}" title="Chỉnh sửa nghĩa / ví dụ" style="font-size:0.9rem; padding:4px;">
+              ✏️
+            </button>
+          ` : ''}
         </div>
       </td>
     </tr>

@@ -1,6 +1,6 @@
 {
   "name": "wordradar",
-  "version": "2.1.0",
+  "version": "2.1.2",
   "description": "WordRadar - Smart Lexical Profiler & Pre-Reading Companion",
   "main": "server.js",
   "scripts": {

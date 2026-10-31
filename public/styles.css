@@ -568,24 +568,55 @@ body {
 
 /* Column widths */
 .col-rank {
-  width: 40px;
+  width: 45px;
+  text-align: center;
 }
 
 .col-word {
   width: auto;
 }
 
+.col-cefr {
+  width: 80px;
+  text-align: center;
+}
+
 .col-count {
   width: 80px;
+  text-align: right;
 }
 
 .col-pct {
-  width: 60px;
+  width: 70px;
+  text-align: right;
 }
 
-.col-save {
-  width: 50px;
+.col-actions {
+  width: 165px;
+  text-align: left;
+}
+
+.data-table th.col-rank,
+.data-table td[data-label="#"] {
   text-align: center;
+}
+
+.data-table th.col-cefr,
+.data-table td[data-label="CEFR"] {
+  text-align: center;
+}
+
+.data-table th.col-count,
+.data-table td[data-label="Count"],
+.data-table th.col-pct,
+.data-table td[data-label="%"] {
+  text-align: right;
+}
+
+.data-table th.col-actions,
+.data-table td.col-actions {
+  text-align: left;
+  padding: 6px 10px;
 }
 
 .data-table th {
@@ -755,11 +786,40 @@ body {
   transition: opacity var(--transition-base);
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: var(--spacing-xs);
+  box-sizing: border-box;
 }
 
 .primary-btn:hover {
   opacity: 0.9;
+}
+
+.secondary-btn {
+  padding: 12px 24px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  font-size: var(--font-size-base);
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--transition-base);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-xs);
+  box-sizing: border-box;
+}
+
+.secondary-btn:hover {
+  background: rgba(255, 255, 255, 0.16);
+  border-color: rgba(255, 255, 255, 0.3);
+  transform: translateY(-1px);
+}
+
+.secondary-btn:active {
+  transform: translateY(0);
 }
 
 /* ==========================================
@@ -1466,11 +1526,6 @@ body {
   background: rgba(255, 255, 255, 0.1);
 }
 
-.col-actions {
-  width: 100px;
-  text-align: right;
-}
-
 /* Definition Styles */
 .section-title {
   display: flex;
@@ -1923,11 +1978,15 @@ body {
 
   .data-table td:last-child {
     border-bottom: none;
-    justify-content: flex-end;
-    gap: 12px;
+    justify-content: space-between;
+    align-items: center;
     margin-top: 8px;
     padding-top: 8px;
     border-top: 1px solid rgba(255, 255, 255, 0.05);
+  }
+
+  .data-table td.col-actions {
+    padding-left: 0;
   }
 
   /* Add labels via pseudo-elements */
@@ -2121,11 +2180,13 @@ body {
   min-height: 54px;
 }
 
+.form-actions,
 .phrase-form .form-actions {
   display: flex;
   justify-content: flex-end;
-  gap: 10px;
-  margin-top: 8px;
+  align-items: center;
+  gap: 12px;
+  margin-top: 16px;
 }
 
 .floating-save-btn {
